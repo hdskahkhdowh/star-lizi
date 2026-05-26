@@ -147,8 +147,26 @@ function hslToRgb(h, s, l) {
   return [Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)];
 }
 
+// ==================== 性能配置 ====================
+const IS_TOUCH = (navigator.maxTouchPoints || 0) > 0 || matchMedia('(pointer: coarse)').matches;
+const SHORT_SIDE = Math.min(window.innerWidth, window.innerHeight);
+const IS_PHONE = IS_TOUCH && SHORT_SIDE < 700;
+const PERF = IS_PHONE ? {
+  label:'mobile', particleCount:360, bgStarCount:120, maxSparkles:24,
+  handFps:14, modelComplexity:0, cameraWidth:424, cameraHeight:320,
+  trail:false, glowRadius:4.2, sparkleChance:0.16
+} : IS_TOUCH ? {
+  label:'tablet', particleCount:520, bgStarCount:180, maxSparkles:36,
+  handFps:18, modelComplexity:0, cameraWidth:480, cameraHeight:360,
+  trail:true, glowRadius:4.8, sparkleChance:0.22
+} : {
+  label:'desktop', particleCount:800, bgStarCount:300, maxSparkles:60,
+  handFps:30, modelComplexity:1, cameraWidth:640, cameraHeight:480,
+  trail:true, glowRadius:6, sparkleChance:0.3
+};
+
 // ==================== 粒子系统 ====================
-const PARTICLE_COUNT = 800;
+const PARTICLE_COUNT = PERF.particleCount;
 const LERP_SPEED = 0.065;
 
 class Particle {
@@ -225,11 +243,11 @@ class Particle {
   draw(enhanced) {
     const [r,g,b] = this.color;
     const a = this.currentBrightness, s = this.currentSize;
-    if(enhanced) {
+    if(enhanced && PERF.trail) {
       ctx.beginPath(); ctx.moveTo(this.prevX,this.prevY); ctx.lineTo(this.x,this.y);
       ctx.strokeStyle=`rgba(${r},${g},${b},${a*0.25})`; ctx.lineWidth=s*0.8; ctx.stroke();
     }
-    const gm = enhanced?6:4;
+    const gm = enhanced?PERF.glowRadius:4;
     ctx.beginPath(); ctx.arc(this.x,this.y,s*gm,0,Math.PI*2);
     ctx.fillStyle=`rgba(${r},${g},${b},${a*(enhanced?0.12:0.08)})`; ctx.fill();
     ctx.beginPath(); ctx.arc(this.x,this.y,s*2.5,0,Math.PI*2);
@@ -247,7 +265,7 @@ class Particle {
       ctx.moveTo(this.x,this.y-len); ctx.lineTo(this.x,this.y+len);
       ctx.stroke();
     }
-    if(enhanced && s>1.8) {
+    if(enhanced && PERF.trail && s>1.8) {
       const sp=Math.sin(Date.now()*0.005+this.lovePhase*3);
       if(sp>0.7) {
         ctx.beginPath(); ctx.arc(this.x,this.y,s*3,0,Math.PI*2);
@@ -276,9 +294,9 @@ function setHandShape(allPoints) {
 // ==================== 火花特效 ====================
 const sparkles = [];
 function emitSparkles(time) {
-  if(sparkles.length>60) return;
+  if(sparkles.length>PERF.maxSparkles) return;
   const p = particles[Math.floor(Math.random()*particles.length)];
-  if(Math.random()<0.3) {
+  if(Math.random()<PERF.sparkleChance) {
     sparkles.push({
       x:p.x, y:p.y, vx:(Math.random()-.5)*3, vy:-1-Math.random()*3,
       life:1, decay:0.015+Math.random()*0.02, size:1+Math.random()*2, color:p.color
@@ -296,7 +314,7 @@ function updateSparkles() {
 }
 
 // ==================== 背景星空 ====================
-const bgStars = Array.from({length:300}, ()=>({
+const bgStars = Array.from({length:PERF.bgStarCount}, ()=>({
   x:Math.random(),y:Math.random(),s:0.3+Math.random()*1.5,b:0.3+Math.random()*0.7,sp:1+Math.random()*3
 }));
 function drawBgStars(time) {
@@ -515,13 +533,14 @@ function startAnimation() {
 
 let cameraActive = false;
 let sendingFrame = false;
+let lastHandFrameTime = 0;
 
 async function openCameraStream() {
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error('当前浏览器不支持摄像头访问');
   }
   const constraintsList = [
-    {audio:false, video:{width:{ideal:640}, height:{ideal:480}, facingMode:{ideal:'user'}}},
+    {audio:false, video:{width:{ideal:PERF.cameraWidth}, height:{ideal:PERF.cameraHeight}, facingMode:{ideal:'user'}}},
     {audio:false, video:{facingMode:'user'}},
     {audio:false, video:true}
   ];
@@ -538,9 +557,12 @@ async function openCameraStream() {
 
 function startHandFrameLoop(hands) {
   cameraActive = true;
+  const handFrameInterval = 1000 / PERF.handFps;
   async function sendFrame() {
     if(!cameraActive) return;
-    if(video.readyState >= 2 && !sendingFrame) {
+    const now = performance.now();
+    if(video.readyState >= 2 && !sendingFrame && now - lastHandFrameTime >= handFrameInterval) {
+      lastHandFrameTime = now;
       sendingFrame = true;
       try {
         await hands.send({image:video});
@@ -561,14 +583,14 @@ async function init() {
     loading.innerHTML='<div style="color:#ff6b6b;text-align:center;max-width:420px;padding:20px;"><p style="font-size:18px">MediaPipe 加载失败</p><p style="font-size:13px;color:#888;margin-top:8px">请检查网络后刷新</p></div>';
     startAnimation(); return;
   }
-  log('初始化 MediaPipe Hands (双手)...');
+  log(`性能模式: ${PERF.label} / ${PARTICLE_COUNT} 粒子 / ${PERF.handFps}fps识别`);
   try {
     const hands = new Hands({
       locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`
     });
     hands.setOptions({
       maxNumHands: MAX_HANDS,
-      modelComplexity: 1,
+      modelComplexity: PERF.modelComplexity,
       minDetectionConfidence: 0.6,
       minTrackingConfidence: 0.5
     });
