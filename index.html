@@ -14,12 +14,16 @@ video{display:none}
 .spinner{width:40px;height:40px;border:3px solid rgba(255,215,0,.2);border-top-color:#ffd700;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px}
 @keyframes spin{to{transform:rotate(360deg)}}
 #debug{position:fixed;bottom:10px;left:10px;z-index:20;color:#0f0;font:12px monospace;background:rgba(0,0,0,.7);padding:6px 10px;border-radius:4px;pointer-events:none}
+#startOverlay{position:fixed;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(10,10,46,.72) 0%,rgba(0,0,0,.9) 70%)}
+#startOverlay.hidden{opacity:0;pointer-events:none;transition:opacity .35s}
+#startBtn{border:1px solid rgba(255,215,0,.75);background:rgba(0,0,0,.72);color:#ffd700;font:700 20px "Segoe UI",sans-serif;padding:14px 28px;border-radius:8px;box-shadow:0 0 22px rgba(255,215,0,.25)}
 </style>
 </head>
 <body>
-<div id="loading"><div class="spinner"></div>正在加载手势识别模型...</div>
+<div id="loading" class="hidden"><div class="spinner"></div>正在加载手势识别模型...</div>
 <div id="debug"></div>
-<video id="video" playsinline></video>
+<div id="startOverlay"><button id="startBtn" type="button">开始识别</button></div>
+<video id="video" autoplay muted playsinline webkit-playsinline></video>
 <canvas id="canvas"></canvas>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js"></script>
@@ -30,6 +34,8 @@ const ctx = canvas.getContext('2d');
 const video = document.getElementById('video');
 const loading = document.getElementById('loading');
 const debugEl = document.getElementById('debug');
+const startOverlay = document.getElementById('startOverlay');
+const startBtn = document.getElementById('startBtn');
 
 let W, H;
 function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
@@ -500,17 +506,60 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
+let animationStarted = false;
+function startAnimation() {
+  if(animationStarted) return;
+  animationStarted = true;
+  animate();
+}
+
+let cameraActive = false;
+let sendingFrame = false;
+
+async function openCameraStream() {
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error('当前浏览器不支持摄像头访问');
+  }
+  const constraintsList = [
+    {audio:false, video:{width:{ideal:640}, height:{ideal:480}, facingMode:{ideal:'user'}}},
+    {audio:false, video:{facingMode:'user'}},
+    {audio:false, video:true}
+  ];
+  let lastError;
+  for(const constraints of constraintsList) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch(err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('摄像头打开失败');
+}
+
+function startHandFrameLoop(hands) {
+  cameraActive = true;
+  async function sendFrame() {
+    if(!cameraActive) return;
+    if(video.readyState >= 2 && !sendingFrame) {
+      sendingFrame = true;
+      try {
+        await hands.send({image:video});
+      } catch(err) {
+        console.warn('[Star] hand frame failed', err);
+      }
+      sendingFrame = false;
+    }
+    requestAnimationFrame(sendFrame);
+  }
+  sendFrame();
+}
+
 // ==================== MediaPipe 初始化 ====================
 async function init() {
   if(typeof Hands==='undefined') {
     log('错误: MediaPipe Hands 未加载');
     loading.innerHTML='<div style="color:#ff6b6b;text-align:center;max-width:420px;padding:20px;"><p style="font-size:18px">MediaPipe 加载失败</p><p style="font-size:13px;color:#888;margin-top:8px">请检查网络后刷新</p></div>';
-    animate(); return;
-  }
-  if(typeof Camera==='undefined') {
-    log('错误: Camera 工具未加载');
-    loading.innerHTML='<div style="color:#ff6b6b;text-align:center;max-width:420px;padding:20px;"><p style="font-size:18px">Camera 工具加载失败</p></div>';
-    animate(); return;
+    startAnimation(); return;
   }
   log('初始化 MediaPipe Hands (双手)...');
   try {
@@ -542,23 +591,27 @@ async function init() {
       if(handData.length===0) handSmoothed=[null,null];
     });
     log('请求摄像头...');
-    const stream = await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:'user'}});
-    video.srcObject=stream; await video.play();
-    const camera = new Camera(video, {
-      onFrame: async()=>{ try{await hands.send({image:video});}catch(e){} },
-      width:640, height:480
-    });
-    camera.start();
+    video.muted = true;
+    video.playsInline = true;
+    const stream = await openCameraStream();
+    video.srcObject = stream;
+    await video.play();
+    startHandFrameLoop(hands);
     loading.classList.add('hidden');
     log('双手手势检测已启动');
-    animate();
+    startAnimation();
   } catch(err) {
     log('失败: '+err.message);
     loading.innerHTML=`<div style="color:#ff6b6b;text-align:center;max-width:420px;padding:20px;"><p style="font-size:18px;margin-bottom:12px">初始化失败</p><p style="font-size:14px;color:#aaa">${err.message}</p><p style="font-size:13px;color:#888;margin-top:12px">请用 localhost 或 HTTPS 访问</p></div>`;
-    animate();
+    startAnimation();
   }
 }
-init();
+startAnimation();
+startBtn.addEventListener('click', () => {
+  startOverlay.classList.add('hidden');
+  loading.classList.remove('hidden');
+  init();
+}, {once:true});
 </script>
 </body>
 </html>
