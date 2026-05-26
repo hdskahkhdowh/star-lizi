@@ -378,31 +378,59 @@ function dist(a, b) {
 }
 
 function countFingers(lms) {
-  let c=0;
+  let c = 0;
   const wrist = lms[0];
   const palmScale = Math.max(0.001, dist(lms[0], lms[9]));
-  const upMargin = palmScale * 0.14;
-  const outMargin = palmScale * 0.08;
-  const fingers = [
-    [8, 6, 5],
-    [12, 10, 9],
-    [16, 14, 13],
-    [20, 18, 17]
-  ];
+  const margin = palmScale * 0.15;
+  let openLongFingers = 0;
 
-  for(const [tip, pip, mcp] of fingers) {
-    const tipFarther = dist(lms[tip], wrist) > dist(lms[pip], wrist) + outMargin;
-    const tipAbove = lms[tip].y < lms[pip].y - upMargin * 0.35;
-    const notFolded = dist(lms[tip], lms[mcp]) > palmScale * 0.34;
-    if((tipFarther || tipAbove) && notFolded) c++;
+  // 四指：tip 距手腕 > pip 距手腕 + margin，且 tip 未折叠到 mcp 附近
+  const fourFingers = [[8,6,5],[12,10,9],[16,14,13],[20,18,17]];
+  for(const [tip, pip, mcp] of fourFingers) {
+    const tipDist = dist(lms[tip], wrist);
+    const pipDist = dist(lms[pip], wrist);
+    const folded = dist(lms[tip], lms[mcp]) < palmScale * 0.55;
+    if(tipDist > pipDist + margin && !folded) {
+      c++;
+      openLongFingers++;
+    }
   }
 
-  const thumbTip = lms[4], thumbIp = lms[3], thumbMcp = lms[2];
-  const thumbFarther = dist(thumbTip, wrist) > dist(thumbIp, wrist) + outMargin;
-  const thumbAway = dist(thumbTip, lms[9]) > dist(thumbMcp, lms[9]) + outMargin;
-  const thumbOpen = thumbFarther && thumbAway && dist(thumbTip, thumbMcp) > palmScale * 0.42;
-  if(thumbOpen) c++;
+  // 拇指：手机/平板上手掌角度变化大，不能只看横向或“比指节更远”。
+  // 张开五指时，拇指通常会远离掌心、远离食指根部，并相对拇指根部向侧边打开。
+  const thumbTip = lms[4];
+  const thumbIp = lms[3];
+  const thumbMcp = lms[2];
+  const palmCenter = {x:(lms[0].x+lms[5].x+lms[9].x+lms[13].x+lms[17].x)/5, y:(lms[0].y+lms[5].y+lms[9].y+lms[13].y+lms[17].y)/5};
+  const thumbExtended = dist(thumbTip, wrist) > dist(thumbIp, wrist) + palmScale * 0.04 || dist(thumbTip, thumbMcp) > palmScale * 0.48;
+  const thumbSideOpen = Math.abs(thumbTip.x - thumbMcp.x) > palmScale * 0.12 || dist(thumbTip, lms[5]) > dist(thumbMcp, lms[5]) + palmScale * 0.03;
+  const thumbAwayFromPalm = dist(thumbTip, palmCenter) > palmScale * (openLongFingers === 4 ? 0.58 : 0.68);
+  const thumbNotTucked = dist(thumbTip, lms[6]) > palmScale * 0.34 && dist(thumbTip, lms[10]) > palmScale * 0.42;
+  if(thumbExtended && thumbSideOpen && thumbAwayFromPalm && thumbNotTucked) c++;
+
   return c;
+}
+
+// =============== 时间投票平滑 ===============
+const fingersHistory = [];
+const FINGERS_HISTORY_MS = 250;
+
+function getSmoothedFingers(raw) {
+  const now = performance.now();
+  fingersHistory.push({v: raw, t: now});
+  while(fingersHistory.length > 0 && now - fingersHistory[0].t > FINGERS_HISTORY_MS)
+    fingersHistory.shift();
+
+  if(fingersHistory.length === 0) return raw;
+
+  // 投票：取众数
+  const counts = {};
+  let maxCount = 0, mode = raw;
+  for(const h of fingersHistory) {
+    counts[h.v] = (counts[h.v] || 0) + 1;
+    if(counts[h.v] > maxCount) { maxCount = counts[h.v]; mode = h.v; }
+  }
+  return mode;
 }
 
 function detectFist(lms) {
@@ -420,8 +448,9 @@ function stabilizeGesture(nextMode, nextFingers) {
     pendingGestureKey = key;
     pendingGestureFrames = 1;
   }
-  const needed = nextMode === 'idle' ? 5 : 3;
-  if(pendingGestureFrames >= needed || gestureMode === 'idle') {
+  // 时间投票已平滑手指计数，这里只防模式跳变
+  const needed = nextMode === 'idle' ? 4 : 2;
+  if(pendingGestureFrames >= needed || (gestureMode === 'idle' && nextMode !== 'idle')) {
     gestureMode = nextMode;
     currentFingers = nextFingers;
   }
@@ -508,9 +537,11 @@ function animate() {
     stabilizeGesture('hands', -1);
   } else if(handData.length === 1) {
     const hd = handData[0];
-    if(hd.isFist) stabilizeGesture('fist', 0);
+    // 拳头与手指互斥：有手指伸开时不判定为拳头
+    const effectiveFist = hd.isFist && hd.fingers <= 1;
+    if(effectiveFist) stabilizeGesture('fist', 0);
     else if(hd.fingers === 5) stabilizeGesture('love', 5);
-    else if(hd.fingers >= 0 && hd.fingers <= 4) stabilizeGesture('number', hd.fingers);
+    else if(hd.fingers >= 1 && hd.fingers <= 4) stabilizeGesture('number', hd.fingers);
     else stabilizeGesture('idle', -1);
   } else {
     stabilizeGesture('idle', -1);
@@ -644,7 +675,8 @@ async function init() {
         for(let i=0; i<results.multiHandLandmarks.length; i++) {
           const raw = results.multiHandLandmarks[i];
           const lms = smoothHand(raw, i);
-          const fingers = countFingers(lms);
+          const rawFingers = countFingers(lms);
+          const fingers = i === 0 ? getSmoothedFingers(rawFingers) : rawFingers;
           const isFist = detectFist(lms);
           const cx = lms[0].x, cy = lms[0].y;
           handData.push({landmarks:lms, fingers, isFist, centerX:cx, centerY:cy});
