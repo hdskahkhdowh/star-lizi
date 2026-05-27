@@ -7,8 +7,10 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#000;overflow:hidden;font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:#fff;user-select:none}
-canvas{display:block;position:fixed;inset:0;z-index:1}
+canvas{display:block;position:fixed;inset:0;z-index:2}
 video{display:none}
+body::before{content:"";position:fixed;inset:-5vh -5vw;z-index:0;pointer-events:none;background:url("./spider-lily-bg.png") center 45%/78% auto no-repeat;opacity:.42;filter:saturate(.92) contrast(.92) brightness(.58);mix-blend-mode:screen}
+body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,.18),rgba(0,0,0,.54) 70%,rgba(0,0,0,.86))}
 
 /* ===== 加载/开始覆盖 ===== */
 .overlay{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s}
@@ -71,6 +73,10 @@ video{display:none}
 /* 手部骨架叠加 */
 #handCanvas{position:fixed;inset:0;z-index:2;pointer-events:none}
 
+/* 雪花前景层 */
+#snowCanvas{position:fixed;inset:0;z-index:15;pointer-events:none;opacity:0;transition:opacity .8s}
+#snowCanvas.visible{opacity:1}
+
 /* ===== 双手照片圣诞树 ===== */
 .photo-upload{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.74);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
 .photo-upload.visible{display:flex}
@@ -82,8 +88,26 @@ video{display:none}
 .photo-layer{position:fixed;inset:0;z-index:12;pointer-events:none;perspective:900px}
 .tree-photo{position:absolute;width:54px;height:54px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,.55);box-shadow:0 0 20px rgba(90,230,180,.18);opacity:0;transform:translate(-50%,-50%) scale(.35);transition:opacity .22s,transform .22s}
 .tree-photo.visible{opacity:.88}
-.featured-photo{position:fixed;left:50%;top:50%;z-index:22;width:min(52vw,520px);height:min(62vh,620px);object-fit:contain;border-radius:8px;border:1px solid rgba(255,255,255,.55);background:rgba(0,0,0,.5);box-shadow:0 28px 120px rgba(0,0,0,.8),0 0 50px rgba(120,220,255,.18);opacity:0;transform:translate(-50%,-50%) scale(.84);transition:opacity .24s,transform .24s;pointer-events:none}
+.tree-ornament{position:absolute;left:50%;top:50%;opacity:0;transform:translate(-50%,-50%) scale(.5);transition:opacity .2s;filter:drop-shadow(0 0 10px rgba(255,230,120,.55));will-change:transform}
+.tree-ornament.visible{opacity:.96}
+.orn-star{width:27px;height:27px;background:linear-gradient(135deg,#fff7a8,#ffcd29 55%,#d88a00);clip-path:polygon(50% 0%,61% 34%,98% 35%,68% 56%,79% 91%,50% 70%,21% 91%,32% 56%,2% 35%,39% 34%)}
+.orn-topstar{width:64px;height:64px;background:linear-gradient(135deg,#fff9b8 0%,#ffd43b 42%,#b96b00 100%);clip-path:polygon(50% 0%,61% 34%,98% 35%,68% 56%,79% 91%,50% 70%,21% 91%,32% 56%,2% 35%,39% 34%);filter:drop-shadow(0 0 20px rgba(255,220,70,.95)) drop-shadow(0 0 44px rgba(255,170,20,.35))}
+.orn-bell{width:22px;height:24px;background:linear-gradient(#ffe68a,#d79a16);border-radius:48% 48% 40% 40%;box-shadow:inset 3px 3px 5px rgba(255,255,255,.45)}
+.orn-bell::after{content:"";position:absolute;left:7px;bottom:-3px;width:8px;height:8px;border-radius:50%;background:#fff0a3}
+.orn-gift{width:31px;height:28px;border-radius:4px;background:linear-gradient(90deg,#d7264d 0 38%,#ffd45c 38% 50%,#d7264d 50%);box-shadow:inset 0 12px 0 rgba(255,255,255,.12),0 0 14px rgba(255,80,120,.55);transform-style:preserve-3d}
+.orn-gift::after{content:"";position:absolute;left:0;top:9px;width:100%;height:4px;background:#ffd45c}
+.orn-ribbon{width:38px;height:8px;border-radius:999px;background:linear-gradient(90deg,#ff345c,#ffd45a,#ff345c);box-shadow:0 0 14px rgba(255,70,120,.65)}
+.featured-photo{position:fixed;left:50%;top:50%;z-index:22;width:min(52vw,520px);height:min(62vh,620px);object-fit:contain;border-radius:10px;border:0;background:transparent;filter:drop-shadow(0 26px 52px rgba(0,0,0,.72)) drop-shadow(0 0 28px rgba(160,220,255,.22));opacity:0;transform:translate(-50%,-50%) scale(.84);transition:opacity .24s,transform .24s;pointer-events:none;-webkit-mask-image:radial-gradient(ellipse at center,#000 44%,rgba(0,0,0,.82) 59%,rgba(0,0,0,.28) 76%,transparent 100%);mask-image:radial-gradient(ellipse at center,#000 44%,rgba(0,0,0,.82) 59%,rgba(0,0,0,.28) 76%,transparent 100%)}
 .featured-photo.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.balloon-layer{position:fixed;inset:0;z-index:18;pointer-events:none;overflow:hidden}
+.balloon{position:absolute;left:50%;bottom:-110px;width:28px;height:38px;border-radius:50% 50% 46% 46%;background:var(--balloon-color);box-shadow:inset -6px -8px 12px rgba(0,0,0,.18),inset 5px 5px 8px rgba(255,255,255,.38),0 0 18px color-mix(in srgb,var(--balloon-color),transparent 55%);animation:balloonFloat var(--dur) ease-out forwards}
+.balloon::before{content:"";position:absolute;left:6px;top:5px;width:6px;height:10px;border-radius:50%;background:rgba(255,255,255,.45);transform:rotate(26deg)}
+.balloon::after{content:"";position:absolute;left:50%;top:36px;width:1px;height:52px;background:rgba(255,255,255,.42);transform:translateX(-50%)}
+@keyframes balloonFloat{
+  0%{transform:translate3d(0,0,0) scale(.45);opacity:0}
+  8%{opacity:.92}
+  100%{transform:translate3d(var(--dx),calc(-100vh - 180px),0) scale(var(--scale));opacity:0}
+}
 
 @media(max-width:640px){
   .panel{right:8px;width:180px;padding:12px}
@@ -170,6 +194,8 @@ video{display:none}
 </div>
 <div class="photo-layer" id="photoLayer"></div>
 <img class="featured-photo" id="featuredPhoto" alt="">
+<div class="balloon-layer" id="balloonLayer"></div>
+<canvas id="snowCanvas"></canvas>
 
 <!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js"></script>
@@ -205,6 +231,7 @@ const photoUpload = document.getElementById('photoUpload');
 const photoInput = document.getElementById('photoInput');
 const photoLayer = document.getElementById('photoLayer');
 const featuredPhoto = document.getElementById('featuredPhoto');
+const balloonLayer = document.getElementById('balloonLayer');
 
 const video = document.createElement('video');
 video.muted = true; video.playsInline = true; video.style.display = 'none';
@@ -219,16 +246,25 @@ const handCtx = handCanvas.getContext('2d');
 // ==================== CONFIG ====================
 const PRESETS = ['#ff4488','#ff6644','#ffaa22','#44dd88','#44aaff','#8866ff','#ff44cc','#ffffff','#00ffcc','#ff8800','#66ff66','#ff66aa'];
 const IS_MOBILE = window.matchMedia('(max-width: 760px), (pointer: coarse)').matches;
-const DEFAULT_PARTICLE_COUNT = IS_MOBILE ? 8000 : 12000;
-const TARGET_FRAME_MS = IS_MOBILE ? 1000 / 30 : 0;
+const DEFAULT_PARTICLE_COUNT = IS_MOBILE ? 7000 : 14000;
+const TARGET_FRAME_MS = IS_MOBILE ? 1000 / 26 : 0;
+const PERF = {
+  maxParticles: IS_MOBILE ? 16000 : 36000,
+  pixelRatio: IS_MOBILE ? 1 : 2,
+  photoThumbs: IS_MOBILE ? 18 : 40,
+  ornaments: IS_MOBILE ? 26 : 76,
+  snow: IS_MOBILE ? 90 : 520,
+  cameraWidth: IS_MOBILE ? 480 : 640,
+  cameraHeight: IS_MOBILE ? 360 : 480,
+};
 let particleCount = DEFAULT_PARTICLE_COUNT;
 let baseColor = new THREE.Color('#ff4488');
 let currentModel = 'heart';
 let pointSize = 3;
-let gestureMode = 'idle'; // idle | number | love | fist | hands
+let gestureMode = 'idle'; // idle | love | fist | hands
 let currentFingers = -1;
 let manualModel = 'heart'; // user-selected model for idle
-const HAND_TRACK_INTERVAL = IS_MOBILE ? 115 : 70;
+const HAND_TRACK_INTERVAL = IS_MOBILE ? 135 : 70;
 let lastHandSend = 0;
 let photoUrls = [];
 let activePhotoIndex = 0;
@@ -236,19 +272,28 @@ let lastWaveX = null;
 let lastWaveAt = 0;
 let photoTreeData = [];
 let photoNodes = [];
+let ornamentNodes = [];
 let photoTreeReady = false;
 let photoDisplayMode = 'none';
 let lastRenderAt = 0;
+let balloonsActive = false;
+let lastBalloonBurstAt = 0;
+
+// Snow system
+const SNOW_COUNT = PERF.snow;
+let snowCanvas, snowCtx;
+let snowParticles = [];
+let snowVisible = false;
 
 countSlider.value = particleCount;
 countVal.textContent = particleCount >= 1000 ? `${particleCount / 1000}k` : String(particleCount);
-if (IS_MOBILE) countSlider.max = '18000';
+countSlider.max = String(PERF.maxParticles);
 
 // ==================== THREE.JS ====================
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.25 : 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, PERF.pixelRatio));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x000000, 1);
+renderer.setClearColor(0x000000, 0);
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -339,10 +384,10 @@ function initParticles(count) {
         float core = smoothstep(0.5, 0.0, d);
         float glow = smoothstep(0.5, 0.12, d);
         float outer = smoothstep(0.5, 0.3, d) * 0.12;
-        vec3 c = vColor * (core*0.55 + glow*0.35 + outer);
+        vec3 c = vColor * (core*0.9 + glow*0.58 + outer);
         float white = smoothstep(0.1, 0.0, d) * 0.65;
         c += vec3(white);
-        gl_FragColor = vec4(c, (core*0.85 + glow*0.35) * vAlpha);
+        gl_FragColor = vec4(c, min((core*1.0 + glow*0.52) * vAlpha, 1.0));
       }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
@@ -460,47 +505,6 @@ function genDNA(n) {
   }
 }
 
-// ==================== NUMBER SHAPES (3D) ====================
-const NUM_SEGS = {
-  1: [[.5,.1,.5,.9],[.3,.2,.5,.1]],
-  2: [[.15,.2,.35,.1],[.35,.1,.7,.1],[.7,.1,.85,.25],[.85,.25,.7,.45],[.7,.45,.15,.7],[.15,.7,.15,.9],[.15,.9,.85,.9]],
-  3: [[.1,.1,.75,.1],[.75,.1,.9,.25],[.9,.25,.7,.45],[.7,.45,.55,.5],[.55,.5,.75,.55],[.75,.55,.9,.7],[.9,.7,.75,.9],[.75,.9,.1,.9]],
-  4: [[.7,.1,.1,.65],[.1,.65,.9,.65],[.8,.1,.8,.9]],
-};
-
-function genNumber(n, num) {
-  const segs = NUM_SEGS[num] || NUM_SEGS[1];
-  const STROKE = 0.15;
-  const scale = 210;
-  const weighted = [];
-  let totalLen = 0;
-  for (const s of segs) {
-    const len = Math.hypot(s[2] - s[0], s[3] - s[1]);
-    if (len < 1e-6) continue;
-    totalLen += len;
-    weighted.push({ s, len, acc: totalLen });
-  }
-
-  for (let i = 0; i < n; i++) {
-    const pick = (i / n + Math.random() / n) * totalLen;
-    const item = weighted.find(w => pick <= w.acc) || weighted[weighted.length - 1];
-    const [x1, y1, x2, y2] = item.s;
-    const dx = x2 - x1, dy = y2 - y1;
-    const len = Math.max(item.len, 1e-6);
-    const nx = -dy / len, ny = dx / len;
-    const t = Math.random();
-    const offset = (Math.random() - 0.5) * STROKE;
-    const cap = (Math.random() - 0.5) * STROKE * 0.45;
-    const px = (x1 + dx * t + nx * offset + (dx / len) * cap - 0.5) * scale;
-    const py = -(y1 + dy * t + ny * offset + (dy / len) * cap - 0.5) * scale;
-    const pz = (Math.random() - 0.5) * 1.2;
-    targetPositions[i*3] = px;
-    targetPositions[i*3+1] = py;
-    targetPositions[i*3+2] = pz;
-  }
-  startTransition();
-}
-
 // ==================== LOVE: L + heart + E (3D) ====================
 function genLove(n) {
   // Split particles: L (20%), heart (60%), E (20%)
@@ -516,7 +520,7 @@ function genLove(n) {
   for (let i = 0; i < heartCount; i++) {
     const idx = lCount + i;
     const u = Math.random() * Math.PI * 2;
-    const r = 0.7 + Math.random() * 0.5;
+    const r = Math.sqrt(Math.random()) * (0.96 + Math.random() * 0.08);
     const x = 16 * Math.pow(Math.sin(u), 3);
     const y = 13*Math.cos(u)-5*Math.cos(2*u)-2*Math.cos(3*u)-Math.cos(4*u);
     targetPositions[idx*3] = x*r*3.8;
@@ -654,7 +658,8 @@ function setFeaturedPhoto(index) {
 function createPhotoNodes() {
   photoLayer.innerHTML = '';
   photoNodes = [];
-  const count = Math.min(photoUrls.length, 32);
+  ornamentNodes = [];
+  const count = Math.min(photoUrls.length, PERF.photoThumbs);
   for (let i = 0; i < count; i++) {
     const img = document.createElement('img');
     img.className = 'tree-photo';
@@ -663,32 +668,96 @@ function createPhotoNodes() {
     photoLayer.appendChild(img);
     photoNodes.push(img);
   }
+  createTreeOrnaments();
   if (photoUrls.length) setFeaturedPhoto(Math.floor(Math.random() * photoUrls.length));
+}
+
+function createTreeOrnaments() {
+  const types = ['star','bell','gift','ribbon','star','bell','gift','ribbon','star','bell','ribbon','bell'];
+  const total = PERF.ornaments;
+  for (let i = 0; i < total; i++) {
+    const type = i === 0 ? 'topstar' : types[i % types.length];
+    const node = document.createElement('div');
+    node.className = `tree-ornament orn-${type}`;
+    const level = type === 'topstar' ? 0 : type === 'gift' ? 0.9 + Math.random() * 0.08 : 0.08 + Math.random() * 0.86;
+    const taper = Math.max(0.12, 1 - level);
+    const radius = type === 'topstar' ? 0 : type === 'gift' ? 36 + Math.random() * 42 : type === 'ribbon' ? 24 + taper * 70 : 18 + taper * 72;
+    node.dataset.type = type;
+    node.dataset.level = String(level);
+    node.dataset.radius = String(radius);
+    node.dataset.angle = String(type === 'gift' ? -Math.PI / 2 + (Math.random() - 0.5) * 1.2 : Math.random() * Math.PI * 2);
+    node.dataset.spin = String(0.22 + Math.random() * 0.16);
+    node.dataset.scale = String(type === 'topstar' ? (IS_MOBILE ? 0.78 : 1) : type === 'gift' ? 0.92 + Math.random() * 0.35 : type === 'ribbon' ? 0.82 + Math.random() * 0.45 : 0.72 + Math.random() * 0.55);
+    node.dataset.scatterX = String((Math.random() - 0.5) * 330);
+    node.dataset.scatterY = String((Math.random() - 0.5) * 235);
+    node.dataset.scatterZ = String((Math.random() - 0.5) * 210);
+    photoLayer.appendChild(node);
+    ornamentNodes.push(node);
+  }
 }
 
 function initPhotoTreeData() {
   photoTreeData = [];
+  const starCount = Math.min(Math.floor(particleCount * 0.05), 520);
+  const trunkCount = Math.floor(particleCount * 0.02);
+  const giftCount = Math.floor(particleCount * 0.035);
+  const ornamentTypes = ['red','gold','white','bell','bell','star_dot','candy','light','light','light','ribbon','ribbon'];
+
   for (let i = 0; i < particleCount; i++) {
-    const level = Math.random();
-    const y = -96 + Math.pow(level, 0.86) * 205;
-    const taper = Math.max(0.05, 1 - level);
-    const tier = Math.floor(level * 10);
-    const branchBand = 0.74 + 0.26 * Math.cos((level * 10 - tier) * Math.PI);
-    const surface = Math.pow(Math.random(), 0.42);
-    const radius = (6 + taper * 82 * branchBand) * surface;
-    const isStar = i < Math.min(130, Math.floor(particleCount * 0.018));
-    const isOrnament = !isStar && Math.random() < 0.085 && surface > 0.58;
+    const isStar = i < starCount;
+    const isTrunk = !isStar && i < starCount + trunkCount;
+    const isGift = !isTrunk && i < starCount + trunkCount + giftCount;
+
+    let y, radius, angle, ornament = '';
+
+    if (isStar) {
+      // Star topper + halo
+      const isHalo = i > starCount * 0.6;
+      y = 108 + (Math.random() - 0.5) * (isHalo ? 24 : 12);
+      radius = isHalo ? 10 + Math.random() * 8 : Math.random() * 6;
+      angle = Math.random() * Math.PI * 2;
+      ornament = isHalo ? 'halo' : 'star';
+    } else if (isTrunk) {
+      // Tree trunk
+      y = -100 + Math.random() * 18;
+      radius = 5 + Math.random() * 8;
+      angle = Math.random() * Math.PI * 2;
+      ornament = 'trunk';
+    } else if (isGift) {
+      // Gift pile at base
+      y = -92 + Math.random() * 14;
+      radius = 25 + Math.random() * 40;
+      angle = Math.random() * Math.PI * 2;
+      ornament = ['gift_red','gift_blue','gift_gold'][Math.floor(Math.random() * 3)];
+    } else {
+      // Tree body
+      const level = Math.random();
+      y = -96 + Math.pow(level, 0.86) * 205;
+      const taper = Math.max(0.05, 1 - level);
+      const tier = Math.floor(level * 10);
+      const branchBand = 0.74 + 0.26 * Math.cos((level * 10 - tier) * Math.PI);
+      const surface = Math.pow(Math.random(), 0.42);
+      radius = (6 + taper * 82 * branchBand) * surface;
+      angle = Math.random() * Math.PI * 2;
+
+      // Decorations on tree surface
+      const rnd = Math.random();
+      if (surface > 0.52 && rnd < 0.24) {
+        ornament = ornamentTypes[Math.floor(Math.random() * ornamentTypes.length)];
+      }
+    }
+
     photoTreeData.push({
-      angle: Math.random() * Math.PI * 2,
+      angle,
       radius,
-      y: isStar ? 108 + (Math.random() - 0.5) * 16 : y,
+      y,
       spin: 0.32 + Math.random() * 0.22,
       bob: Math.random() * Math.PI * 2,
       scatterX: (Math.random() - 0.5) * 260,
       scatterY: (Math.random() - 0.5) * 190,
       scatterZ: (Math.random() - 0.5) * 170,
       drift: 0.2 + Math.random() * 0.45,
-      ornament: isStar ? 'star' : isOrnament ? ['red','gold','white'][Math.floor(Math.random() * 3)] : ''
+      ornament
     });
   }
   photoTreeReady = true;
@@ -706,11 +775,34 @@ function updatePhotoTreeTargets(time, exploded = false) {
     } else {
       const a = d.angle + time * d.spin;
       if (d.ornament === 'star') {
-        const starR = 8 + Math.sin(i * 1.7) * 4;
+        // Top star - tight orbit
+        const starR = 6 + Math.sin(i * 1.7) * 3;
         targetPositions[i3] = Math.cos(a * 2.8) * starR;
-        targetPositions[i3+1] = d.y + Math.sin(i * 2.1) * 5;
+        targetPositions[i3+1] = d.y + Math.sin(i * 2.1) * 4;
         targetPositions[i3+2] = Math.sin(a * 2.8) * starR;
+      } else if (d.ornament === 'halo') {
+        // Star halo - wider orbit, slower
+        const haloR = d.radius + Math.sin(time * 0.8 + i) * 2;
+        targetPositions[i3] = Math.cos(a * 1.5) * haloR;
+        targetPositions[i3+1] = d.y + Math.sin(time * 0.6 + i * 0.5) * 3;
+        targetPositions[i3+2] = Math.sin(a * 1.5) * haloR;
+      } else if (d.ornament === 'trunk') {
+        // Trunk - fixed cylinder
+        targetPositions[i3] = Math.cos(d.angle) * d.radius;
+        targetPositions[i3+1] = d.y;
+        targetPositions[i3+2] = Math.sin(d.angle) * d.radius;
+      } else if (d.ornament && d.ornament.startsWith('gift')) {
+        // Gift pile - gentle bob
+        targetPositions[i3] = Math.cos(d.angle) * d.radius;
+        targetPositions[i3+1] = d.y + Math.sin(time * 0.5 + d.bob) * 0.8;
+        targetPositions[i3+2] = Math.sin(d.angle) * d.radius;
+      } else if (d.ornament === 'ribbon') {
+        const ribbonA = d.angle + time * d.spin + d.y * 0.065;
+        targetPositions[i3] = Math.cos(ribbonA) * (d.radius + 2.5);
+        targetPositions[i3+1] = d.y + Math.sin(d.y * 0.16) * 1.6;
+        targetPositions[i3+2] = Math.sin(ribbonA) * (d.radius + 2.5);
       } else {
+        // Tree body + decorations
         targetPositions[i3] = Math.cos(a) * d.radius;
         targetPositions[i3+1] = d.y + Math.sin(time * 1.4 + d.bob) * 1.4;
         targetPositions[i3+2] = Math.sin(a) * d.radius;
@@ -734,6 +826,7 @@ function getDualHands() {
 function updatePhotoTreeUI(time, leftHand, rightHand, displayActive, exploded = false) {
   if (!photoUrls.length || !displayActive) {
     photoNodes.forEach(node => node.classList.remove('visible'));
+    ornamentNodes.forEach(node => node.classList.remove('visible'));
     featuredPhoto.classList.remove('visible');
     return;
   }
@@ -769,6 +862,51 @@ function updatePhotoTreeUI(time, leftHand, rightHand, displayActive, exploded = 
     node.classList.add('visible');
   }
 
+  for (let i = 0; i < ornamentNodes.length; i++) {
+    const node = ornamentNodes[i];
+    const type = node.dataset.type;
+    const level = parseFloat(node.dataset.level);
+    const baseRadius = parseFloat(node.dataset.radius);
+    const spin = parseFloat(node.dataset.spin);
+    let x, y, z, depth, rot = 0;
+    if (exploded) {
+      const a = parseFloat(node.dataset.angle) + time * (0.12 + i * 0.0008);
+      x = parseFloat(node.dataset.scatterX) + Math.cos(a) * 12;
+      y = parseFloat(node.dataset.scatterY) + Math.sin(a * 1.17) * 9;
+      z = parseFloat(node.dataset.scatterZ) + Math.sin(a) * 10;
+      depth = 0.78 + (z + 100) / 290;
+      rot = a * 38;
+    } else {
+      if (type === 'topstar') {
+        y = 116;
+        x = Math.sin(time * 0.9) * 1.5;
+        z = 45;
+        depth = 1.18;
+        rot = Math.sin(time * 0.8) * 7;
+      } else if (type === 'gift') {
+        y = -94 + (level - 0.9) * 22;
+        const a = parseFloat(node.dataset.angle) + Math.sin(time * 0.35 + i) * 0.08;
+        x = Math.cos(a) * baseRadius;
+        z = Math.sin(a) * baseRadius + 40;
+        depth = 0.9 + (z + 70) / 260;
+        rot = Math.sin(a) * 7;
+      } else {
+        y = 92 - level * 188;
+        const a = parseFloat(node.dataset.angle) + time * spin + (type === 'ribbon' ? y * 0.07 : 0);
+        x = Math.cos(a) * baseRadius;
+        z = Math.sin(a) * baseRadius;
+        depth = 0.72 + (z + 90) / 240;
+        rot = type === 'ribbon' ? -18 + Math.sin(a) * 24 : Math.sin(a) * 10;
+      }
+    }
+    const s = parseFloat(node.dataset.scale) * Math.max(0.64, depth);
+    node.style.left = `${centerX + x * scale}px`;
+    node.style.top = `${centerY - y * scale}px`;
+    node.style.transform = `translate(-50%,-50%) rotate(${rot}deg) scale(${s})`;
+    node.style.zIndex = String(24 + Math.round(depth * 18));
+    node.classList.add('visible');
+  }
+
   const leftOpen = leftHand && leftHand.fingers >= 4 && !leftHand.isFist;
   if (leftOpen) {
     if (!featuredPhoto.classList.contains('visible')) {
@@ -792,10 +930,61 @@ function updatePhotoTreeUI(time, leftHand, rightHand, displayActive, exploded = 
 
 function hidePhotoTreeUI() {
   photoNodes.forEach(node => node.classList.remove('visible'));
+  ornamentNodes.forEach(node => node.classList.remove('visible'));
   featuredPhoto.classList.remove('visible');
   lastWaveX = null;
   if (photoDisplayMode !== 'none') updateColors();
   photoDisplayMode = 'none';
+  setSnowVisible(false);
+}
+
+// ==================== SNOWFALL (2D Canvas) ====================
+function initSnowCanvas() {
+  snowCanvas = document.getElementById('snowCanvas');
+  snowCtx = snowCanvas.getContext('2d');
+  resizeSnowCanvas();
+  snowParticles = [];
+  for (let i = 0; i < SNOW_COUNT; i++) {
+    snowParticles.push({
+      x: Math.random() * snowCanvas.width,
+      y: Math.random() * snowCanvas.height,
+      r: 1 + Math.random() * 2.5,
+      speed: 0.3 + Math.random() * 0.8,
+      wind: (Math.random() - 0.5) * 0.4,
+      wobble: Math.random() * Math.PI * 2,
+      wobbleSpeed: 0.01 + Math.random() * 0.02,
+      opacity: 0.3 + Math.random() * 0.7,
+    });
+  }
+}
+
+function resizeSnowCanvas() {
+  if (!snowCanvas) return;
+  snowCanvas.width = window.innerWidth;
+  snowCanvas.height = window.innerHeight;
+}
+
+function setSnowVisible(visible) {
+  snowVisible = visible;
+  if (snowCanvas) snowCanvas.classList.toggle('visible', visible);
+}
+
+function updateSnowCanvas() {
+  if (!snowCtx || !snowVisible) return;
+  const W = snowCanvas.width, H = snowCanvas.height;
+  snowCtx.clearRect(0, 0, W, H);
+  for (const p of snowParticles) {
+    p.y += p.speed;
+    p.wobble += p.wobbleSpeed;
+    p.x += p.wind + Math.sin(p.wobble) * 0.3;
+    if (p.y > H + 5) { p.y = -5; p.x = Math.random() * W; }
+    if (p.x > W + 5) p.x = -5;
+    if (p.x < -5) p.x = W + 5;
+    snowCtx.beginPath();
+    snowCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    snowCtx.fillStyle = `rgba(255,255,255,${p.opacity})`;
+    snowCtx.fill();
+  }
 }
 
 // ==================== FIST ORBIT ====================
@@ -848,12 +1037,31 @@ function updatePhotoTreeColors() {
     red: new THREE.Color('#ff3b3b'),
     gold: new THREE.Color('#ffd45a'),
     white: new THREE.Color('#f7fff4'),
-    star: new THREE.Color('#ffe86b')
+    star: new THREE.Color('#ffe86b'),
+    star_dot: new THREE.Color('#fff06a'),
+    halo: new THREE.Color('#fff4b8'),
+    trunk: new THREE.Color('#5a3a1a'),
+    bell: new THREE.Color('#ffd700'),
+    candy: new THREE.Color('#ff6b8a'),
+    ribbon: new THREE.Color('#ff335f'),
+    light: null, // assigned per-particle
+    gift_red: new THREE.Color('#ee3344'),
+    gift_blue: new THREE.Color('#4488ee'),
+    gift_gold: new THREE.Color('#ffcc00'),
   };
+  const lightColors = [
+    new THREE.Color('#ff3366'), // pink
+    new THREE.Color('#33ccff'), // cyan
+    new THREE.Color('#ffee33'), // yellow
+    new THREE.Color('#33ff88'), // green
+    new THREE.Color('#ff6633'), // orange
+  ];
   for (let i = 0; i < particleCount; i++) {
     const d = photoTreeData[i] || {};
     let c;
-    if (d.ornament) {
+    if (d.ornament === 'light') {
+      c = lightColors[i % lightColors.length];
+    } else if (d.ornament) {
       c = palette[d.ornament] || palette.gold;
     } else {
       const twinkle = 0.54 + 0.28 * Math.sin(phases[i] * 2.7);
@@ -866,6 +1074,37 @@ function updatePhotoTreeColors() {
   geometry.attributes.color.needsUpdate = true;
 }
 
+// ==================== BALLOONS ====================
+function launchBalloons() {
+  const now = performance.now();
+  if (balloonsActive || now - lastBalloonBurstAt < 4500) return;
+  balloonsActive = true;
+  lastBalloonBurstAt = now;
+  balloonLayer.innerHTML = '';
+  const colors = ['#ff4d7d','#ffcc33','#56d8ff','#7cff6b','#b47cff','#ff8a3d','#ffffff','#36f5c5'];
+  const total = 200;
+  for (let i = 0; i < total; i++) {
+    const b = document.createElement('div');
+    b.className = 'balloon';
+    const col = colors[i % colors.length];
+    const lane = total <= 1 ? 0.5 : i / (total - 1);
+    const jitter = (Math.random() - 0.5) * 22;
+    const start = lane * 100 + (Math.random() - 0.5) * 2;
+    const dx = (lane - 0.5) * window.innerWidth * 0.86 + jitter;
+    b.style.left = `${start}%`;
+    b.style.setProperty('--balloon-color', col);
+    b.style.setProperty('--dx', `${dx}px`);
+    b.style.setProperty('--scale', `${0.72 + Math.random() * 0.78}`);
+    b.style.setProperty('--dur', `${5.8 + Math.random() * 3.2}s`);
+    b.style.animationDelay = `${Math.random() * 1.4}s`;
+    balloonLayer.appendChild(b);
+  }
+  setTimeout(() => {
+    balloonLayer.innerHTML = '';
+    balloonsActive = false;
+  }, 9800);
+}
+
 // ==================== MEDIAPIPE HANDS ====================
 let handSmoothed = [null, null];
 let handData = [];
@@ -873,7 +1112,7 @@ let handData = [];
 let fingersHistory = [[], []];
 const FINGERS_HIST_MS = 400;
 let pendingKey = '', pendingFrames = 0;
-let lastShapedMode = '', lastShapedFingers = -1;
+let lastShapedMode = '';
 
 function smoothHand(lms, idx) {
   if(!handSmoothed[idx]) { handSmoothed[idx]=lms.map(l=>({x:l.x,y:l.y,z:l.z})); return handSmoothed[idx]; }
@@ -986,10 +1225,6 @@ function updateHud() {
       modeText.textContent = 'IDLE';
       subText.textContent = 'Show hand to interact · Select model on panel';
       break;
-    case 'number':
-      modeText.textContent = `NUMBER ${currentFingers}`;
-      subText.textContent = `${currentFingers} finger${currentFingers>1?'s':''} detected`;
-      break;
     case 'love':
       modeText.textContent = 'LOVE';
       subText.textContent = 'Open palm detected';
@@ -1024,7 +1259,6 @@ function animate(now = 0) {
     const ef = hd.isFist && hd.fingers <= 1;
     if (ef) stabilizeGesture('fist', 0);
     else if (hd.fingers === 5) stabilizeGesture('love', 5);
-    else if (hd.fingers >= 1 && hd.fingers <= 4) stabilizeGesture('number', hd.fingers);
     else stabilizeGesture('idle', -1);
   } else {
     stabilizeGesture('idle', -1);
@@ -1032,9 +1266,8 @@ function animate(now = 0) {
 
   // Shape updates
   const modeChanged = gestureMode !== lastShapedMode;
-  const fingersChanged = gestureMode==='number' && currentFingers!==lastShapedFingers;
 
-  if (modeChanged || fingersChanged) {
+  if (modeChanged) {
     switch(gestureMode) {
       case 'idle':
         hidePhotoUpload();
@@ -1042,18 +1275,12 @@ function animate(now = 0) {
         setModelShape(manualModel);
         controls.autoRotate = true;
         break;
-      case 'number':
-        hidePhotoUpload();
-        hidePhotoTreeUI();
-        resetFrontView();
-        genNumber(particleCount, currentFingers);
-        controls.autoRotate = false;
-        break;
       case 'love':
         hidePhotoUpload();
         hidePhotoTreeUI();
         resetFrontView();
         genLove(particleCount);
+        launchBalloons();
         controls.autoRotate = false;
         break;
       case 'fist':
@@ -1074,7 +1301,6 @@ function animate(now = 0) {
         break;
     }
     lastShapedMode = gestureMode;
-    lastShapedFingers = currentFingers;
   }
 
   // Per-frame updates
@@ -1102,8 +1328,10 @@ function animate(now = 0) {
         if (displayActive) {
           updatePhotoTreeColors();
           startTransition();
+          setSnowVisible(true);
         } else {
           updateColors();
+          setSnowVisible(false);
         }
       }
       if (displayActive) updatePhotoTreeTargets(elapsed, exploded);
@@ -1127,6 +1355,7 @@ function animate(now = 0) {
     geometry.attributes.position.needsUpdate = true;
   }
 
+  updateSnowCanvas();
   updateHud();
   controls.update();
   renderer.render(scene, camera);
@@ -1165,7 +1394,7 @@ async function initHandTracking() {
 
   loadingOverlay.classList.remove('hidden');
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({audio:false, video:{width:{ideal:640},height:{ideal:480},facingMode:'user'}});
+    const stream = await navigator.mediaDevices.getUserMedia({audio:false, video:{width:{ideal:PERF.cameraWidth},height:{ideal:PERF.cameraHeight},facingMode:'user'}});
     video.srcObject = stream;
     await video.play();
     const cam = new Camera(video, {
@@ -1175,8 +1404,8 @@ async function initHandTracking() {
         lastHandSend = now;
         await hands.send({image:video});
       },
-      width: 640,
-      height: 480
+      width: PERF.cameraWidth,
+      height: PERF.cameraHeight
     });
     cam.start();
     loadingOverlay.classList.add('hidden');
@@ -1257,8 +1486,9 @@ window.addEventListener('resize', () => {
   camera.aspect=window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.25 : 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, PERF.pixelRatio));
   resizeHandCanvas();
+  resizeSnowCanvas();
   if(material) material.uniforms.uPixelRatio.value=renderer.getPixelRatio();
 });
 
@@ -1270,6 +1500,7 @@ startBtn.addEventListener('click', async () => {
 }, {once:true});
 
 initParticles(particleCount);
+initSnowCanvas();
 animate();
 </script>
 </body>
