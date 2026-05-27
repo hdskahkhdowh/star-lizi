@@ -265,9 +265,9 @@ const PERF = {
   ornaments: IS_MOBILE ? 20 : 76,
   snow: IS_MOBILE ? 50 : 520,
   bgStars: IS_MOBILE ? 450 : 2000,
-  modelComplexity: IS_MOBILE ? 0 : 1,
-  cameraWidth: IS_MOBILE ? 480 : 640,
-  cameraHeight: IS_MOBILE ? 360 : 480,
+  modelComplexity: 1,
+  cameraWidth: IS_MOBILE ? 640 : 640,
+  cameraHeight: IS_MOBILE ? 480 : 480,
 };
 let particleCount = DEFAULT_PARTICLE_COUNT;
 let baseColor = new THREE.Color('#ff4488');
@@ -276,7 +276,7 @@ let pointSize = 3;
 let gestureMode = 'idle'; // idle | love | fist | hands
 let currentFingers = -1;
 let manualModel = 'heart'; // user-selected model for idle
-const HAND_TRACK_INTERVAL = IS_MOBILE ? 150 : 70;
+const HAND_TRACK_INTERVAL = IS_MOBILE ? 80 : 70;
 let lastHandSend = 0;
 let photoUrls = [];
 let activePhotoIndex = 0;
