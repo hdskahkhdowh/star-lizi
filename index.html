@@ -3,712 +3,1274 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>手势星空粒子</title>
+<title>3D Particle Universe</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif}
+body{background:#000;overflow:hidden;font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:#fff;user-select:none}
 canvas{display:block;position:fixed;inset:0;z-index:1}
 video{display:none}
-#loading{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;background:radial-gradient(ellipse at center,#0a0a2e 0%,#000 70%);color:#ffd700;font-size:20px;transition:opacity .8s}
-#loading.hidden{opacity:0;pointer-events:none}
-.spinner{width:40px;height:40px;border:3px solid rgba(255,215,0,.2);border-top-color:#ffd700;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px}
+
+/* ===== 加载/开始覆盖 ===== */
+.overlay{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s}
+.overlay.hidden{opacity:0;pointer-events:none}
+#startOverlay{background:radial-gradient(ellipse at center,rgba(10,10,46,.85) 0%,rgba(0,0,0,.95) 70%)}
+#startBtn{border:1px solid rgba(180,210,255,.5);background:rgba(255,255,255,.04);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);color:rgba(180,210,255,.9);font:600 18px 'Segoe UI',sans-serif;padding:14px 36px;border-radius:12px;cursor:pointer;letter-spacing:2px;transition:all .25s}
+#startBtn:hover{background:rgba(100,180,255,.12);border-color:rgba(180,210,255,.7);box-shadow:0 0 30px rgba(100,180,255,.15)}
+#loadingOverlay{background:radial-gradient(ellipse at center,rgba(10,10,46,.9) 0%,rgba(0,0,0,.95) 70%)}
+.spinner{width:36px;height:36px;border:2px solid rgba(180,210,255,.15);border-top-color:rgba(180,210,255,.7);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px}
 @keyframes spin{to{transform:rotate(360deg)}}
-#debug{position:fixed;bottom:10px;left:10px;z-index:20;color:#0f0;font:12px monospace;background:rgba(0,0,0,.7);padding:6px 10px;border-radius:4px;pointer-events:none}
-#startOverlay{position:fixed;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(10,10,46,.72) 0%,rgba(0,0,0,.9) 70%)}
-#startOverlay.hidden{opacity:0;pointer-events:none;transition:opacity .35s}
-#startBtn{border:1px solid rgba(255,215,0,.75);background:rgba(0,0,0,.72);color:#ffd700;font:700 20px "Segoe UI",sans-serif;padding:14px 28px;border-radius:8px;box-shadow:0 0 22px rgba(255,215,0,.25)}
+.load-text{font-size:14px;color:rgba(180,210,255,.5);letter-spacing:1px}
+
+/* ===== 手势状态指示 ===== */
+.gesture-hud{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:25;text-align:center;pointer-events:none;transition:opacity .3s}
+.gesture-hud .mode-text{font-size:14px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:rgba(180,210,255,.6);text-shadow:0 0 20px rgba(100,150,255,.3)}
+.gesture-hud .sub-text{font-size:11px;color:rgba(255,255,255,.25);margin-top:4px;letter-spacing:1px}
+
+/* ===== 右上角按钮组 ===== */
+.top-btns{position:fixed;top:14px;right:14px;z-index:30;display:flex;gap:8px}
+.icon-btn{width:38px;height:38px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:rgba(255,255,255,.45);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .25s}
+.icon-btn:hover{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.2)}
+
+/* ===== 控制面板 ===== */
+.panel{position:fixed;top:50%;right:16px;z-index:25;transform:translateY(-50%);width:210px;max-height:90vh;overflow-y:auto;padding:18px;border:1px solid rgba(255,255,255,.07);border-radius:16px;background:rgba(10,10,30,.5);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);box-shadow:0 8px 40px rgba(0,0,0,.4);transition:opacity .35s,transform .35s}
+.panel.collapsed{opacity:0;transform:translateY(-50%) translateX(30px);pointer-events:none}
+.panel::-webkit-scrollbar{width:3px}
+.panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+.section-label{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:10px}
+
+/* 模型网格 */
+.model-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:18px}
+.model-btn{height:56px;border:1px solid rgba(255,255,255,.05);border-radius:10px;background:rgba(255,255,255,.02);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:all .2s}
+.model-btn:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)}
+.model-btn.active{border-color:rgba(100,180,255,.45);background:rgba(100,180,255,.06)}
+.model-btn .icon{font-size:18px;line-height:1}
+.model-btn .label{font-size:10px;color:rgba(255,255,255,.4);font-weight:500}
+.model-btn.active .label{color:rgba(180,210,255,.8)}
+
+/* 颜色 */
+.color-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.color-preview{width:28px;height:28px;border-radius:7px;border:1px solid rgba(255,255,255,.1);cursor:pointer;position:relative;overflow:hidden;flex-shrink:0}
+.color-preview input{position:absolute;inset:-4px;width:calc(100% + 8px);height:calc(100% + 8px);border:none;cursor:pointer;opacity:0}
+.color-hex{flex:1;height:28px;border:1px solid rgba(255,255,255,.06);border-radius:7px;background:rgba(255,255,255,.02);color:rgba(255,255,255,.6);font:12px monospace;padding:0 8px;outline:none;text-align:center}
+.color-hex:focus{border-color:rgba(100,180,255,.35)}
+.preset-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:16px}
+.dot{width:18px;height:18px;border-radius:5px;border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:all .2s}
+.dot:hover{transform:scale(1.25);border-color:rgba(255,255,255,.25)}
+.dot.active{border-color:#fff;box-shadow:0 0 6px rgba(255,255,255,.3)}
+
+/* 滑块 */
+.slider-group{margin-bottom:14px}
+.slider-row{display:flex;align-items:center;gap:8px}
+.slider-row input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:rgba(255,255,255,.08);outline:none}
+.slider-row input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;border-radius:50%;background:rgba(180,210,255,.85);cursor:pointer;box-shadow:0 0 6px rgba(100,180,255,.3)}
+.slider-val{font-size:11px;color:rgba(255,255,255,.35);min-width:30px;text-align:right}
+
+/* 底部提示 */
+.footer{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:20;font-size:11px;color:rgba(255,255,255,.15);letter-spacing:1px;pointer-events:none}
+
+/* 手部骨架叠加 */
+#handCanvas{position:fixed;inset:0;z-index:2;pointer-events:none}
+
+/* ===== 双手照片圣诞树 ===== */
+.photo-upload{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.74);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.photo-upload.visible{display:flex}
+.upload-box{width:min(420px,calc(100vw - 32px));padding:24px;border:1px solid rgba(180,210,255,.22);border-radius:8px;background:rgba(8,12,28,.86);box-shadow:0 18px 70px rgba(0,0,0,.55);text-align:center}
+.upload-title{font-size:18px;font-weight:700;letter-spacing:2px;color:rgba(220,238,255,.92);margin-bottom:10px}
+.upload-copy{font-size:13px;line-height:1.7;color:rgba(220,238,255,.55);margin-bottom:18px}
+.upload-btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 18px;border:1px solid rgba(120,210,180,.5);border-radius:7px;background:rgba(80,210,160,.12);color:rgba(220,255,245,.9);font-size:14px;font-weight:650;letter-spacing:1px;cursor:pointer}
+.upload-btn input{display:none}
+.photo-layer{position:fixed;inset:0;z-index:12;pointer-events:none;perspective:900px}
+.tree-photo{position:absolute;width:54px;height:54px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,.55);box-shadow:0 0 20px rgba(90,230,180,.18);opacity:0;transform:translate(-50%,-50%) scale(.35);transition:opacity .22s,transform .22s}
+.tree-photo.visible{opacity:.88}
+.featured-photo{position:fixed;left:50%;top:50%;z-index:22;width:min(52vw,520px);height:min(62vh,620px);object-fit:contain;border-radius:8px;border:1px solid rgba(255,255,255,.55);background:rgba(0,0,0,.5);box-shadow:0 28px 120px rgba(0,0,0,.8),0 0 50px rgba(120,220,255,.18);opacity:0;transform:translate(-50%,-50%) scale(.84);transition:opacity .24s,transform .24s;pointer-events:none}
+.featured-photo.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+@media(max-width:640px){
+  .panel{right:8px;width:180px;padding:12px}
+  .model-btn{height:48px}
+}
 </style>
 </head>
 <body>
-<div id="loading" class="hidden"><div class="spinner"></div>正在加载手势识别模型...</div>
-<div id="debug"></div>
-<div id="startOverlay"><button id="startBtn" type="button">开始识别</button></div>
-<video id="video" autoplay muted playsinline webkit-playsinline></video>
-<canvas id="canvas"></canvas>
 
+<!-- 覆盖层 -->
+<div class="overlay" id="startOverlay">
+  <button id="startBtn">START</button>
+</div>
+<div class="overlay hidden" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="load-text">Loading hand tracking model...</div>
+</div>
+
+<!-- 手势状态 -->
+<div class="gesture-hud" id="gestureHud">
+  <div class="mode-text" id="modeText">IDLE</div>
+  <div class="sub-text" id="subText"></div>
+</div>
+
+<!-- 按钮 -->
+<div class="top-btns">
+  <button class="icon-btn" id="togglePanel" title="Panel">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="2.5" width="14" height="1.3" rx=".65" fill="currentColor"/><rect x="1" y="7.3" width="10" height="1.3" rx=".65" fill="currentColor"/><rect x="1" y="12.2" width="14" height="1.3" rx=".65" fill="currentColor"/></svg>
+  </button>
+  <button class="icon-btn" id="btnFS" title="Fullscreen">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</div>
+
+<!-- 面板 -->
+<div class="panel" id="panel">
+  <div class="section-label">Model</div>
+  <div class="model-grid" id="modelGrid">
+    <button class="model-btn active" data-model="heart"><span class="icon">&hearts;</span><span class="label">Heart</span></button>
+    <button class="model-btn" data-model="flower"><span class="icon">&#10047;</span><span class="label">Flower</span></button>
+    <button class="model-btn" data-model="saturn"><span class="icon">&#129668;</span><span class="label">Saturn</span></button>
+    <button class="model-btn" data-model="firework"><span class="icon">&#10022;</span><span class="label">Firework</span></button>
+    <button class="model-btn" data-model="galaxy"><span class="icon">&#127744;</span><span class="label">Galaxy</span></button>
+    <button class="model-btn" data-model="dna"><span class="icon">&#129516;</span><span class="label">DNA</span></button>
+  </div>
+
+  <div class="section-label">Color</div>
+  <div class="color-row">
+    <div class="color-preview" id="colorPrev" style="background:#ff4488">
+      <input type="color" id="colorPicker" value="#ff4488">
+    </div>
+    <input class="color-hex" id="colorHex" value="#ff4488" maxlength="7">
+  </div>
+  <div class="preset-row" id="presetRow"></div>
+
+  <div class="section-label">Particles</div>
+  <div class="slider-group">
+    <div class="slider-row">
+      <input type="range" id="countSlider" min="2000" max="30000" step="1000" value="12000">
+      <span class="slider-val" id="countVal">12k</span>
+    </div>
+  </div>
+
+  <div class="section-label">Size</div>
+  <div class="slider-group">
+    <div class="slider-row">
+      <input type="range" id="sizeSlider" min="1" max="8" step=".5" value="3">
+      <span class="slider-val" id="sizeVal">3</span>
+    </div>
+  </div>
+</div>
+
+<div class="footer">Drag to rotate · Scroll to zoom</div>
+
+<div class="photo-upload" id="photoUpload">
+  <div class="upload-box">
+    <div class="upload-title">UPLOAD PHOTOS</div>
+    <div class="upload-copy">双手模式会进入照片圣诞树程序。先选择几张照片，再用右手握拳生成圣诞树，左手张开和挥动切换照片。</div>
+    <label class="upload-btn">
+      选择照片
+      <input type="file" id="photoInput" accept="image/*" multiple>
+    </label>
+  </div>
+</div>
+<div class="photo-layer" id="photoLayer"></div>
+<img class="featured-photo" id="featuredPhoto" alt="">
+
+<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.min.js"></script>
-<script>
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const video = document.getElementById('video');
-const loading = document.getElementById('loading');
-const debugEl = document.getElementById('debug');
+
+<!-- Three.js import map -->
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ==================== ELEMENTS ====================
 const startOverlay = document.getElementById('startOverlay');
 const startBtn = document.getElementById('startBtn');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const gestureHud = document.getElementById('gestureHud');
+const modeText = document.getElementById('modeText');
+const subText = document.getElementById('subText');
+const panel = document.getElementById('panel');
+const modelGrid = document.getElementById('modelGrid');
+const colorPicker = document.getElementById('colorPicker');
+const colorHex = document.getElementById('colorHex');
+const colorPrev = document.getElementById('colorPrev');
+const presetRow = document.getElementById('presetRow');
+const countSlider = document.getElementById('countSlider');
+const countVal = document.getElementById('countVal');
+const sizeSlider = document.getElementById('sizeSlider');
+const sizeVal = document.getElementById('sizeVal');
+const photoUpload = document.getElementById('photoUpload');
+const photoInput = document.getElementById('photoInput');
+const photoLayer = document.getElementById('photoLayer');
+const featuredPhoto = document.getElementById('featuredPhoto');
 
-let W, H;
-function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
-resize();
-window.addEventListener('resize', resize);
+const video = document.createElement('video');
+video.muted = true; video.playsInline = true; video.style.display = 'none';
+document.body.appendChild(video);
 
-function log(msg) { console.log('[Star]', msg); debugEl.textContent = msg; }
+const handCanvas = document.getElementById('handCanvas') || document.createElement('canvas');
+handCanvas.id = 'handCanvas';
+handCanvas.style.cssText = 'position:fixed;inset:0;z-index:2;pointer-events:none';
+document.body.appendChild(handCanvas);
+const handCtx = handCanvas.getContext('2d');
 
-// ==================== LOVE 文字采样 ====================
-function generateLovePoints(count) {
-  const tmp = document.createElement('canvas');
-  const tctx = tmp.getContext('2d');
-  const fontSize = Math.min(W * 0.55, 360);
-  tmp.width = W; tmp.height = H;
-  tctx.fillStyle = '#fff';
-  tctx.font = `900 ${fontSize}px "Arial Black","Impact",sans-serif`;
-  tctx.textAlign = 'center'; tctx.textBaseline = 'middle';
-  tctx.fillText('LOVE', W/2, H/2);
-  const imgData = tctx.getImageData(0,0,W,H).data;
-  const filled = [];
-  for (let y = 0; y < H; y += 4)
-    for (let x = 0; x < W; x += 4)
-      if (imgData[(y*W+x)*4+3] > 128) filled.push([x/W, y/H]);
-  if (!filled.length) return Array.from({length:count}, ()=>[0.5,0.5]);
-  const pts = [];
-  for (let i = 0; i < count; i++) {
-    const p = filled[Math.floor(i * filled.length / count) % filled.length];
-    pts.push(p);
-  }
-  return pts;
+// ==================== CONFIG ====================
+const PRESETS = ['#ff4488','#ff6644','#ffaa22','#44dd88','#44aaff','#8866ff','#ff44cc','#ffffff','#00ffcc','#ff8800','#66ff66','#ff66aa'];
+const IS_MOBILE = window.matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+const DEFAULT_PARTICLE_COUNT = IS_MOBILE ? 8000 : 12000;
+const TARGET_FRAME_MS = IS_MOBILE ? 1000 / 30 : 0;
+let particleCount = DEFAULT_PARTICLE_COUNT;
+let baseColor = new THREE.Color('#ff4488');
+let currentModel = 'heart';
+let pointSize = 3;
+let gestureMode = 'idle'; // idle | number | love | fist | hands
+let currentFingers = -1;
+let manualModel = 'heart'; // user-selected model for idle
+const HAND_TRACK_INTERVAL = IS_MOBILE ? 115 : 70;
+let lastHandSend = 0;
+let photoUrls = [];
+let activePhotoIndex = 0;
+let lastWaveX = null;
+let lastWaveAt = 0;
+let photoTreeData = [];
+let photoNodes = [];
+let photoTreeReady = false;
+let photoDisplayMode = 'none';
+let lastRenderAt = 0;
+
+countSlider.value = particleCount;
+countVal.textContent = particleCount >= 1000 ? `${particleCount / 1000}k` : String(particleCount);
+if (IS_MOBILE) countSlider.max = '18000';
+
+// ==================== THREE.JS ====================
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.25 : 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 1);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000011, 0.0006);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+camera.position.set(0, 0, 220);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.3;
+controls.minDistance = 50;
+controls.maxDistance = 600;
+
+function resetFrontView(distance = 220) {
+  camera.position.set(0, 0, distance);
+  camera.up.set(0, 1, 0);
+  controls.target.set(0, 0, 0);
+  controls.update();
 }
 
-// ==================== 手部骨架均匀采样 ====================
-const HAND_CONNECTIONS = [
-  [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
-  [5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],
-  [13,17],[17,18],[18,19],[19,20],[0,17]
-];
+// Background stars
+{
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(2000 * 3);
+  for (let i = 0; i < 2000; i++) {
+    pos[i*3] = (Math.random()-.5)*1600; pos[i*3+1] = (Math.random()-.5)*1600; pos[i*3+2] = (Math.random()-.5)*1600;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x6666aa, size: 0.8, transparent: true, opacity: 0.35, sizeAttenuation: true })));
+}
 
-function generateHandPoints(lms, count) {
+// ==================== PARTICLE SYSTEM ====================
+let geometry, material, points;
+let positions, targetPositions, colors, sizes, phases, animProgress;
+let transitioning = false;
+
+function initParticles(count) {
+  if (points) { scene.remove(points); geometry.dispose(); material.dispose(); }
+  particleCount = count;
+  positions = new Float32Array(count * 3);
+  targetPositions = new Float32Array(count * 3);
+  colors = new Float32Array(count * 3);
+  sizes = new Float32Array(count);
+  phases = new Float32Array(count);
+  animProgress = new Float32Array(count);
+
+  for (let i = 0; i < count; i++) {
+    positions[i*3]   = (Math.random()-.5)*300;
+    positions[i*3+1] = (Math.random()-.5)*300;
+    positions[i*3+2] = (Math.random()-.5)*300;
+    targetPositions[i*3]   = positions[i*3];
+    targetPositions[i*3+1] = positions[i*3+1];
+    targetPositions[i*3+2] = positions[i*3+2];
+    colors[i*3] = baseColor.r; colors[i*3+1] = baseColor.g; colors[i*3+2] = baseColor.b;
+    sizes[i] = pointSize * (0.4 + Math.random()*0.6);
+    phases[i] = Math.random() * Math.PI * 2;
+    animProgress[i] = 1;
+  }
+
+  geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+  geometry.setAttribute('phase', new THREE.BufferAttribute(phases, 1));
+
+  material = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() } },
+    vertexShader: `
+      attribute float size; attribute float phase; attribute vec3 color;
+      varying vec3 vColor; varying float vAlpha;
+      uniform float uTime; uniform float uPixelRatio;
+      void main(){
+        vColor = color;
+        float tw = 0.6 + 0.4 * sin(uTime * 2.0 + phase);
+        vAlpha = tw;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = max(size * uPixelRatio * (200.0 / -mv.z) * tw, 1.0);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      varying vec3 vColor; varying float vAlpha;
+      void main(){
+        float d = length(gl_PointCoord - vec2(0.5));
+        if(d > 0.5) discard;
+        float core = smoothstep(0.5, 0.0, d);
+        float glow = smoothstep(0.5, 0.12, d);
+        float outer = smoothstep(0.5, 0.3, d) * 0.12;
+        vec3 c = vColor * (core*0.55 + glow*0.35 + outer);
+        float white = smoothstep(0.1, 0.0, d) * 0.65;
+        c += vec3(white);
+        gl_FragColor = vec4(c, (core*0.85 + glow*0.35) * vAlpha);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+
+  points = new THREE.Points(geometry, material);
+  scene.add(points);
+  applyModelTargets();
+}
+
+// ==================== 3D SHAPE GENERATORS ====================
+function applyModelTargets() {
+  if (gestureMode === 'idle') {
+    setModelShape(manualModel);
+  }
+}
+
+function setModelShape(model) {
+  currentModel = model;
+  const n = particleCount;
+  switch(model) {
+    case 'heart': genHeart(n); break;
+    case 'flower': genFlower(n); break;
+    case 'saturn': genSaturn(n); break;
+    case 'firework': genFirework(n); break;
+    case 'galaxy': genGalaxy(n); break;
+    case 'dna': genDNA(n); break;
+  }
+  startTransition();
+}
+
+function startTransition() {
+  for (let i = 0; i < particleCount; i++) animProgress[i] = -Math.random() * 0.6;
+  transitioning = true;
+}
+
+function genHeart(n) {
+  for (let i = 0; i < n; i++) {
+    const u = Math.random() * Math.PI * 2;
+    const r = 0.75 + Math.random() * 0.5;
+    const x = 16 * Math.pow(Math.sin(u), 3);
+    const y = 13*Math.cos(u) - 5*Math.cos(2*u) - 2*Math.cos(3*u) - Math.cos(4*u);
+    const z = (Math.random()-.5) * 5;
+    const s = r * 5;
+    targetPositions[i*3] = x*s; targetPositions[i*3+1] = y*s; targetPositions[i*3+2] = z*s;
+  }
+}
+
+function genFlower(n) {
+  for (let i = 0; i < n; i++) {
+    const t = Math.random() * Math.PI * 2;
+    const pa = t * 6;
+    const r = (40 + 30*Math.cos(pa)) * (0.5 + 0.5*Math.cos(pa));
+    const layer = Math.random();
+    targetPositions[i*3] = r*Math.cos(t)*(0.8+layer*.4);
+    targetPositions[i*3+1] = (Math.random()-.5)*12 + layer*6*Math.sin(pa*.5);
+    targetPositions[i*3+2] = r*Math.sin(t)*(0.8+layer*.4);
+  }
+}
+
+function genSaturn(n) {
+  const sn = Math.floor(n*0.45);
+  for (let i = 0; i < sn; i++) {
+    const phi = Math.acos(2*Math.random()-1), th = Math.random()*Math.PI*2;
+    const r = 35 * Math.cbrt(Math.random());
+    targetPositions[i*3] = r*Math.sin(phi)*Math.cos(th);
+    targetPositions[i*3+1] = r*Math.cos(phi)*0.7;
+    targetPositions[i*3+2] = r*Math.sin(phi)*Math.sin(th);
+  }
+  for (let i = sn; i < n; i++) {
+    const a = Math.random()*Math.PI*2, r = 55+Math.random()*45;
+    const tk = (Math.random()-.5)*5;
+    targetPositions[i*3] = r*Math.cos(a);
+    targetPositions[i*3+1] = tk - r*Math.sin(a)*0.08;
+    targetPositions[i*3+2] = r*Math.sin(a)*0.96;
+  }
+}
+
+function genFirework(n) {
+  const bc = 5, pp = Math.floor(n/bc);
+  for (let b = 0; b < bc; b++) {
+    const cx=(Math.random()-.5)*180, cy=(Math.random()-.5)*180, cz=(Math.random()-.5)*80;
+    const br = 25+Math.random()*35;
+    for (let j = 0; j < pp; j++) {
+      const idx = b*pp+j; if(idx>=n)break;
+      const phi=Math.acos(2*Math.random()-1), th=Math.random()*Math.PI*2;
+      const r = br*Math.pow(Math.random(),.4);
+      targetPositions[idx*3] = cx+r*Math.sin(phi)*Math.cos(th);
+      targetPositions[idx*3+1] = cy+r*Math.cos(phi);
+      targetPositions[idx*3+2] = cz+r*Math.sin(phi)*Math.sin(th);
+    }
+  }
+  for (let i = bc*pp; i < n; i++) {
+    targetPositions[i*3]=(Math.random()-.5)*250; targetPositions[i*3+1]=(Math.random()-.5)*250; targetPositions[i*3+2]=(Math.random()-.5)*100;
+  }
+}
+
+function genGalaxy(n) {
+  for (let i = 0; i < n; i++) {
+    const arm = i % 4, aa = (arm/4)*Math.PI*2, t = Math.random();
+    const r = t*120, sp = (Math.random()-.5)*(8+r*.15);
+    const sa = aa + t*3.5;
+    targetPositions[i*3] = r*Math.cos(sa)+sp*Math.cos(sa+Math.PI/2);
+    targetPositions[i*3+1] = (Math.random()-.5)*(4+r*.06)*Math.exp(-t*1.5);
+    targetPositions[i*3+2] = r*Math.sin(sa)+sp*Math.sin(sa+Math.PI/2);
+  }
+}
+
+function genDNA(n) {
+  for (let i = 0; i < n; i++) {
+    const t=i/n, y=(t-.5)*180, a=t*4*Math.PI*2, s=i%3;
+    let x,z;
+    if(s<2){const r=30+(Math.random()-.5)*4; x=r*Math.cos(a+s*Math.PI); z=r*Math.sin(a+s*Math.PI);}
+    else{const rt=Math.random(); x=30*(Math.cos(a)*rt+Math.cos(a+Math.PI)*(1-rt)); z=30*(Math.sin(a)*rt+Math.sin(a+Math.PI)*(1-rt));}
+    targetPositions[i*3]=x+(Math.random()-.5)*2; targetPositions[i*3+1]=y; targetPositions[i*3+2]=z+(Math.random()-.5)*2;
+  }
+}
+
+// ==================== NUMBER SHAPES (3D) ====================
+const NUM_SEGS = {
+  1: [[.5,.1,.5,.9],[.3,.2,.5,.1]],
+  2: [[.15,.2,.35,.1],[.35,.1,.7,.1],[.7,.1,.85,.25],[.85,.25,.7,.45],[.7,.45,.15,.7],[.15,.7,.15,.9],[.15,.9,.85,.9]],
+  3: [[.1,.1,.75,.1],[.75,.1,.9,.25],[.9,.25,.7,.45],[.7,.45,.55,.5],[.55,.5,.75,.55],[.75,.55,.9,.7],[.9,.7,.75,.9],[.75,.9,.1,.9]],
+  4: [[.7,.1,.1,.65],[.1,.65,.9,.65],[.8,.1,.8,.9]],
+};
+
+function genNumber(n, num) {
+  const segs = NUM_SEGS[num] || NUM_SEGS[1];
+  const STROKE = 0.15;
+  const scale = 210;
+  const weighted = [];
+  let totalLen = 0;
+  for (const s of segs) {
+    const len = Math.hypot(s[2] - s[0], s[3] - s[1]);
+    if (len < 1e-6) continue;
+    totalLen += len;
+    weighted.push({ s, len, acc: totalLen });
+  }
+
+  for (let i = 0; i < n; i++) {
+    const pick = (i / n + Math.random() / n) * totalLen;
+    const item = weighted.find(w => pick <= w.acc) || weighted[weighted.length - 1];
+    const [x1, y1, x2, y2] = item.s;
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.max(item.len, 1e-6);
+    const nx = -dy / len, ny = dx / len;
+    const t = Math.random();
+    const offset = (Math.random() - 0.5) * STROKE;
+    const cap = (Math.random() - 0.5) * STROKE * 0.45;
+    const px = (x1 + dx * t + nx * offset + (dx / len) * cap - 0.5) * scale;
+    const py = -(y1 + dy * t + ny * offset + (dy / len) * cap - 0.5) * scale;
+    const pz = (Math.random() - 0.5) * 1.2;
+    targetPositions[i*3] = px;
+    targetPositions[i*3+1] = py;
+    targetPositions[i*3+2] = pz;
+  }
+  startTransition();
+}
+
+// ==================== LOVE: L + heart + E (3D) ====================
+function genLove(n) {
+  // Split particles: L (20%), heart (60%), E (20%)
+  const lCount = Math.floor(n * 0.2);
+  const heartCount = Math.floor(n * 0.6);
+  const eCount = n - lCount - heartCount;
+
+  // "L" shape segments
+  const lSegs = [[.05,.08,.05,.92],[.05,.92,.45,.92]];
+  sampleSegsToTarget(lSegs, 0, lCount, -110, 0, 180);
+
+  // Heart (parametric)
+  for (let i = 0; i < heartCount; i++) {
+    const idx = lCount + i;
+    const u = Math.random() * Math.PI * 2;
+    const r = 0.7 + Math.random() * 0.5;
+    const x = 16 * Math.pow(Math.sin(u), 3);
+    const y = 13*Math.cos(u)-5*Math.cos(2*u)-2*Math.cos(3*u)-Math.cos(4*u);
+    targetPositions[idx*3] = x*r*3.8;
+    targetPositions[idx*3+1] = y*r*3.8 - 5;
+    targetPositions[idx*3+2] = (Math.random()-.5)*2;
+  }
+
+  // "E" shape
+  const eSegs = [[.55,.08,.55,.92],[.55,.08,.98,.08],[.55,.5,.9,.5],[.55,.92,.98,.92]];
+  sampleSegsToTarget(eSegs, lCount+heartCount, eCount, 110, 0, 180);
+
+  startTransition();
+}
+
+function sampleSegsToTarget(segs, offset, count, offX, offY, scale) {
+  const stroke = 0.18;
+  const weighted = [];
+  let totalLen = 0;
+  for (const s of segs) {
+    const len = Math.hypot(s[2] - s[0], s[3] - s[1]);
+    if (len < 1e-6) continue;
+    totalLen += len;
+    weighted.push({ s, len, acc: totalLen });
+  }
+  for (let i = 0; i < count; i++) {
+    const pick = (i / count + Math.random() / count) * totalLen;
+    const item = weighted.find(w => pick <= w.acc) || weighted[weighted.length - 1];
+    const [x1, y1, x2, y2] = item.s;
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.max(item.len, 1e-6);
+    const nx = -dy / len, ny = dx / len;
+    const t = Math.random();
+    const across = (Math.random() - 0.5) * stroke;
+    const along = (Math.random() - 0.5) * stroke * 0.35;
+    const px = x1 + dx * t + nx * across + (dx / len) * along;
+    const py = y1 + dy * t + ny * across + (dy / len) * along;
+    const idx = offset + i;
+    targetPositions[idx*3] = (px-0.5)*scale + offX;
+    targetPositions[idx*3+1] = -(py-0.5)*scale + offY;
+    targetPositions[idx*3+2] = (Math.random()-.5)*1.5;
+  }
+}
+
+// ==================== HAND SHAPE (3D) ====================
+const HAND_CONNS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+
+function genHandShape(lmsArr, count) {
+  // lmsArr: array of {x,y,z} normalized 0-1
   const segs = [];
   let totalLen = 0;
-  for (const [a, b] of HAND_CONNECTIONS) {
-    const l = Math.hypot(lms[b].x - lms[a].x, lms[b].y - lms[a].y);
-    segs.push({a, b, l}); totalLen += l;
+  for (const [a,b] of HAND_CONNS) {
+    const l = Math.hypot(lmsArr[b].x-lmsArr[a].x, lmsArr[b].y-lmsArr[a].y);
+    segs.push({a,b,l}); totalLen += l;
   }
   const spacing = totalLen / count;
-  const points = [];
+  const pts = [];
   let dist = spacing * 0.5;
   for (const seg of segs) {
     let d = dist;
-    while (d <= seg.l && points.length < count) {
+    while (d <= seg.l && pts.length < count) {
       const t = d / seg.l;
-      points.push([
-        lms[seg.a].x + (lms[seg.b].x - lms[seg.a].x) * t,
-        lms[seg.a].y + (lms[seg.b].y - lms[seg.a].y) * t
-      ]);
+      pts.push({
+        x: lmsArr[seg.a].x + (lmsArr[seg.b].x-lmsArr[seg.a].x)*t,
+        y: lmsArr[seg.a].y + (lmsArr[seg.b].y-lmsArr[seg.a].y)*t,
+        z: (lmsArr[seg.a].z||0) + ((lmsArr[seg.b].z||0)-(lmsArr[seg.a].z||0))*t
+      });
       d += spacing;
     }
     dist = d - seg.l;
   }
-  while (points.length < count) points.push(points[points.length-1] || [lms[0].x, lms[0].y]);
-  return points;
+  while (pts.length < count) pts.push(pts[pts.length-1]||{x:.5,y:.5,z:0});
+
+  const scale = 200;
+  for (let i = 0; i < count; i++) {
+    targetPositions[i*3]   = (pts[i].x - 0.5) * scale;
+    targetPositions[i*3+1] = -(pts[i].y - 0.5) * scale;
+    targetPositions[i*3+2] = (pts[i].z || 0) * scale * 0.5;
+  }
+  startTransition();
 }
 
-// ==================== 数字形状 ====================
-const SHAPES = {};
-SHAPES[0] = [[.35,.15,.65,.15],[.65,.15,.75,.3],[.75,.3,.75,.7],[.75,.7,.65,.85],[.65,.85,.35,.85],[.35,.85,.25,.7],[.25,.7,.25,.3],[.25,.3,.35,.15]];
-SHAPES[1] = [[.5,.1,.5,.9],[.35,.2,.5,.1]];
-SHAPES[2] = [[.25,.2,.4,.1],[.4,.1,.65,.1],[.65,.1,.8,.25],[.8,.25,.65,.45],[.65,.45,.25,.7],[.25,.7,.25,.9],[.25,.9,.8,.9]];
-SHAPES[3] = [[.2,.1,.75,.1],[.75,.1,.85,.25],[.85,.25,.7,.45],[.7,.45,.55,.5],[.55,.5,.75,.55],[.75,.55,.85,.7],[.85,.7,.75,.9],[.75,.9,.2,.9]];
-SHAPES[4] = [[.6,.1,.2,.65],[.2,.65,.8,.65],[.75,.1,.75,.9]];
-SHAPES[5] = [[.75,.1,.25,.1],[.25,.1,.2,.35],[.2,.35,.65,.35],[.65,.35,.8,.5],[.8,.5,.7,.75],[.7,.75,.35,.85],[.35,.85,.2,.9],[.2,.9,.8,.9]];
+function genDualHand(h1, h2, count) {
+  const half = Math.floor(count / 2);
+  const segs1 = [], segs2 = [];
+  let tl1 = 0, tl2 = 0;
+  for (const [a, b] of HAND_CONNS) {
+    const l1 = Math.hypot(h1[b].x - h1[a].x, h1[b].y - h1[a].y);
+    const l2 = Math.hypot(h2[b].x - h2[a].x, h2[b].y - h2[a].y);
+    segs1.push({ a, b, l: l1 }); tl1 += l1;
+    segs2.push({ a, b, l: l2 }); tl2 += l2;
+  }
 
-function generateLinePoints(segs, count) {
-  let totalLen = 0;
-  const lens = segs.map(s => { const l = Math.hypot(s[2]-s[0],s[3]-s[1]); totalLen += l; return l; });
+  sampleLmsToTarget(h1, segs1, tl1, 0, half, -50);
+  sampleLmsToTarget(h2, segs2, tl2, half, count - half, 50);
+}
+
+function sampleLmsToTarget(lms, segs, totalLen, offset, count, xOff) {
   const spacing = totalLen / count;
   const pts = [];
-  let dist = spacing * 0.5;
-  for (let i = 0; i < segs.length && pts.length < count; i++) {
-    const s = segs[i], l = lens[i];
+  let dist = spacing*0.5;
+  for (const seg of segs) {
     let d = dist;
-    while (d <= l && pts.length < count) {
-      const t = d / l;
-      pts.push([s[0]+(s[2]-s[0])*t, s[1]+(s[3]-s[1])*t]);
-      d += spacing;
+    while(d<=seg.l && pts.length<count){
+      const t=d/seg.l;
+      pts.push({x:lms[seg.a].x+(lms[seg.b].x-lms[seg.a].x)*t,y:lms[seg.a].y+(lms[seg.b].y-lms[seg.a].y)*t,z:(lms[seg.a].z||0)+((lms[seg.b].z||0)-(lms[seg.a].z||0))*t});
+      d+=spacing;
     }
-    dist = d - l;
+    dist=d-seg.l;
   }
-  while (pts.length < count) pts.push(pts[pts.length-1]||[.5,.5]);
-  return pts;
+  while(pts.length<count) pts.push(pts[pts.length-1]||{x:.5,y:.5,z:0});
+  const scale=200;
+  for(let i=0;i<count;i++){
+    const idx=offset+i;
+    targetPositions[idx*3]=(pts[i].x-0.5)*scale+xOff;
+    targetPositions[idx*3+1]=-(pts[i].y-0.5)*scale;
+    targetPositions[idx*3+2]=(pts[i].z||0)*scale*0.5;
+  }
 }
 
-// ==================== 颜色工具 ====================
-const NEON_COLORS = [
-  [255,0,128],[255,0,255],[128,0,255],[0,128,255],
-  [0,255,255],[0,255,128],[128,255,0],[255,255,0],
-  [255,128,0],[255,64,64],[255,100,200],[100,200,255],
-  [180,100,255],[255,200,50],[50,255,200],[255,80,180]
-];
-
-function hslToRgb(h, s, l) {
-  h=((h%360)+360)%360; s/=100; l/=100;
-  const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2;
-  let r,g,b;
-  if(h<60){r=c;g=x;b=0}else if(h<120){r=x;g=c;b=0}else if(h<180){r=0;g=c;b=x}
-  else if(h<240){r=0;g=x;b=c}else if(h<300){r=x;g=0;b=c}else{r=c;g=0;b=x}
-  return [Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)];
+// ==================== PHOTO TREE (DUAL HAND MODE) ====================
+function showPhotoUpload() {
+  if (!photoUrls.length) photoUpload.classList.add('visible');
 }
 
-// ==================== 性能配置 ====================
-const IS_TOUCH = (navigator.maxTouchPoints || 0) > 0 || matchMedia('(pointer: coarse)').matches;
-const SHORT_SIDE = Math.min(window.innerWidth, window.innerHeight);
-const IS_PHONE = IS_TOUCH && SHORT_SIDE < 700;
-const PERF = IS_PHONE ? {
-  label:'mobile', particleCount:360, bgStarCount:120, maxSparkles:24,
-  handFps:14, modelComplexity:0, cameraWidth:424, cameraHeight:320,
-  trail:false, glowRadius:4.2, sparkleChance:0.16
-} : IS_TOUCH ? {
-  label:'tablet', particleCount:520, bgStarCount:180, maxSparkles:36,
-  handFps:18, modelComplexity:0, cameraWidth:480, cameraHeight:360,
-  trail:true, glowRadius:4.8, sparkleChance:0.22
-} : {
-  label:'desktop', particleCount:800, bgStarCount:300, maxSparkles:60,
-  handFps:30, modelComplexity:1, cameraWidth:640, cameraHeight:480,
-  trail:true, glowRadius:6, sparkleChance:0.3
-};
+function hidePhotoUpload() {
+  photoUpload.classList.remove('visible');
+}
 
-// ==================== 粒子系统 ====================
-const PARTICLE_COUNT = PERF.particleCount;
-const LERP_SPEED = 0.065;
+function setFeaturedPhoto(index) {
+  if (!photoUrls.length) return;
+  activePhotoIndex = (index + photoUrls.length) % photoUrls.length;
+  featuredPhoto.src = photoUrls[activePhotoIndex];
+}
 
-class Particle {
-  constructor(i) {
-    this.x = Math.random()*W; this.y = Math.random()*H;
-    this.tx = this.x; this.ty = this.y;
-    this.size = 0.6 + Math.random()*2.8;
-    this.brightness = 0.5 + Math.random()*0.5;
-    this.twinkleSpeed = 1.5 + Math.random()*4;
-    this.twinklePhase = Math.random()*Math.PI*2;
-    this.driftX = (Math.random()-.5)*0.4;
-    this.driftY = (Math.random()-.5)*0.4;
-    this.angle = Math.random()*Math.PI*2;
-    this.orbitSpeed = 0.001 + Math.random()*0.003;
-    this.orbitRadius = 20 + Math.random()*60;
-    this.fistAngle = Math.random()*Math.PI*2;
-    this.fistOrbitR = 30 + Math.random()*140;
-    this.fistOrbitSpeed = 0.006 + Math.random()*0.022;
-    this.fistBob = Math.random()*Math.PI*2;
-    this.fistBobSpeed = 0.015 + Math.random()*0.03;
-    this.fistBobAmp = 10 + Math.random()*50;
-    this.baseColor = NEON_COLORS[i % NEON_COLORS.length];
-    this.color = [...this.baseColor];
-    this.lovePhase = Math.random()*Math.PI*2;
-    this.loveShimmer = 2 + Math.random()*4;
-    this.prevX = this.x; this.prevY = this.y;
-    this.currentSize = this.size;
-    this.currentBrightness = this.brightness;
+function createPhotoNodes() {
+  photoLayer.innerHTML = '';
+  photoNodes = [];
+  const count = Math.min(photoUrls.length, 32);
+  for (let i = 0; i < count; i++) {
+    const img = document.createElement('img');
+    img.className = 'tree-photo';
+    img.src = photoUrls[i % photoUrls.length];
+    img.alt = '';
+    photoLayer.appendChild(img);
+    photoNodes.push(img);
   }
-  setTarget(nx, ny) { this.tx = nx*W; this.ty = ny*H; }
-  idleUpdate(time) {
-    this.angle += this.orbitSpeed;
-    this.tx += Math.cos(this.angle)*this.orbitRadius*0.01 + this.driftX;
-    this.ty += Math.sin(this.angle)*this.orbitRadius*0.01 + this.driftY;
-    if(this.tx<50)this.tx=50; if(this.tx>W-50)this.tx=W-50;
-    if(this.ty<50)this.ty=50; if(this.ty>H-50)this.ty=H-50;
-    this.color = [...this.baseColor];
+  if (photoUrls.length) setFeaturedPhoto(Math.floor(Math.random() * photoUrls.length));
+}
+
+function initPhotoTreeData() {
+  photoTreeData = [];
+  for (let i = 0; i < particleCount; i++) {
+    const level = Math.random();
+    const y = -96 + Math.pow(level, 0.86) * 205;
+    const taper = Math.max(0.05, 1 - level);
+    const tier = Math.floor(level * 10);
+    const branchBand = 0.74 + 0.26 * Math.cos((level * 10 - tier) * Math.PI);
+    const surface = Math.pow(Math.random(), 0.42);
+    const radius = (6 + taper * 82 * branchBand) * surface;
+    const isStar = i < Math.min(130, Math.floor(particleCount * 0.018));
+    const isOrnament = !isStar && Math.random() < 0.085 && surface > 0.58;
+    photoTreeData.push({
+      angle: Math.random() * Math.PI * 2,
+      radius,
+      y: isStar ? 108 + (Math.random() - 0.5) * 16 : y,
+      spin: 0.32 + Math.random() * 0.22,
+      bob: Math.random() * Math.PI * 2,
+      scatterX: (Math.random() - 0.5) * 260,
+      scatterY: (Math.random() - 0.5) * 190,
+      scatterZ: (Math.random() - 0.5) * 170,
+      drift: 0.2 + Math.random() * 0.45,
+      ornament: isStar ? 'star' : isOrnament ? ['red','gold','white'][Math.floor(Math.random() * 3)] : ''
+    });
   }
-  fistUpdate(time, cx, cy) {
-    this.fistAngle += this.fistOrbitSpeed;
-    this.fistBob += this.fistBobSpeed;
-    this.tx = cx + Math.cos(this.fistAngle)*this.fistOrbitR;
-    this.ty = cy + Math.sin(this.fistAngle)*this.fistOrbitR + Math.sin(this.fistBob)*this.fistBobAmp;
-    this.color = [...this.baseColor];
-  }
-  loveUpdate(time, phase) {
-    const hue = (this.tx/W*360 + time*80 + phase) % 360;
-    this.color = hslToRgb(hue, 100, 60);
-    this.currentSize = this.size * (1 + Math.sin(time*3+this.lovePhase)*0.3);
-    this.currentBrightness = this.brightness * (0.75 + 0.25*Math.sin(time*this.loveShimmer+this.lovePhase));
-  }
-  handsUpdate(time) {
-    // 彩虹色流光
-    const hue = (this.tx/W*360 + this.ty/H*120 + time*60) % 360;
-    this.color = hslToRgb(hue, 100, 60);
-    const shimmer = Math.sin(time*3 + this.lovePhase);
-    this.currentBrightness = this.brightness * (0.7 + 0.3*shimmer);
-    this.currentSize = this.size * (0.9 + 0.1*shimmer);
-  }
-  numberUpdate(time) {
-    const hue = (this.baseColor[0]>200?45:this.baseColor[1]>200?180:280) + Math.sin(time*0.5+this.lovePhase)*20;
-    this.color = hslToRgb(hue, 90, 55);
-  }
-  update(time) {
-    this.prevX = this.x; this.prevY = this.y;
-    this.x += (this.tx - this.x) * LERP_SPEED;
-    this.y += (this.ty - this.y) * LERP_SPEED;
-    const tw = Math.sin(time*this.twinkleSpeed+this.twinklePhase);
-    if(!this._loveMode) {
-      this.currentBrightness = this.brightness*(0.7+0.3*tw);
-      this.currentSize = this.size*(0.85+0.15*tw);
-    }
-  }
-  draw(enhanced) {
-    const [r,g,b] = this.color;
-    const a = this.currentBrightness, s = this.currentSize;
-    if(enhanced && PERF.trail) {
-      ctx.beginPath(); ctx.moveTo(this.prevX,this.prevY); ctx.lineTo(this.x,this.y);
-      ctx.strokeStyle=`rgba(${r},${g},${b},${a*0.25})`; ctx.lineWidth=s*0.8; ctx.stroke();
-    }
-    const gm = enhanced?PERF.glowRadius:4;
-    ctx.beginPath(); ctx.arc(this.x,this.y,s*gm,0,Math.PI*2);
-    ctx.fillStyle=`rgba(${r},${g},${b},${a*(enhanced?0.12:0.08)})`; ctx.fill();
-    ctx.beginPath(); ctx.arc(this.x,this.y,s*2.5,0,Math.PI*2);
-    ctx.fillStyle=`rgba(${r},${g},${b},${a*0.25})`; ctx.fill();
-    ctx.beginPath(); ctx.arc(this.x,this.y,s,0,Math.PI*2);
-    ctx.fillStyle=`rgba(${r},${g},${b},${a})`; ctx.fill();
-    ctx.beginPath(); ctx.arc(this.x,this.y,s*0.4,0,Math.PI*2);
-    ctx.fillStyle=`rgba(255,255,255,${a*0.85})`; ctx.fill();
-    if(s>1.2) {
-      ctx.strokeStyle=`rgba(255,255,255,${a*(enhanced?0.5:0.3)})`;
-      ctx.lineWidth=enhanced?0.8:0.5;
-      const len=s*(enhanced?3.5:2.5);
-      ctx.beginPath();
-      ctx.moveTo(this.x-len,this.y); ctx.lineTo(this.x+len,this.y);
-      ctx.moveTo(this.x,this.y-len); ctx.lineTo(this.x,this.y+len);
-      ctx.stroke();
-    }
-    if(enhanced && PERF.trail && s>1.8) {
-      const sp=Math.sin(Date.now()*0.005+this.lovePhase*3);
-      if(sp>0.7) {
-        ctx.beginPath(); ctx.arc(this.x,this.y,s*3,0,Math.PI*2);
-        ctx.strokeStyle=`rgba(255,255,255,${sp*0.3})`; ctx.lineWidth=0.6; ctx.stroke();
+  photoTreeReady = true;
+}
+
+function updatePhotoTreeTargets(time, exploded = false) {
+  if (!photoTreeReady || photoTreeData.length !== particleCount) initPhotoTreeData();
+  for (let i = 0; i < particleCount; i++) {
+    const d = photoTreeData[i];
+    const i3 = i * 3;
+    if (exploded) {
+      targetPositions[i3] = d.scatterX + Math.sin(time * d.drift + d.bob) * 5;
+      targetPositions[i3+1] = d.scatterY + Math.cos(time * d.drift + d.angle) * 4;
+      targetPositions[i3+2] = d.scatterZ + Math.sin(time * d.drift * 0.7 + d.angle) * 6;
+    } else {
+      const a = d.angle + time * d.spin;
+      if (d.ornament === 'star') {
+        const starR = 8 + Math.sin(i * 1.7) * 4;
+        targetPositions[i3] = Math.cos(a * 2.8) * starR;
+        targetPositions[i3+1] = d.y + Math.sin(i * 2.1) * 5;
+        targetPositions[i3+2] = Math.sin(a * 2.8) * starR;
+      } else {
+        targetPositions[i3] = Math.cos(a) * d.radius;
+        targetPositions[i3+1] = d.y + Math.sin(time * 1.4 + d.bob) * 1.4;
+        targetPositions[i3+2] = Math.sin(a) * d.radius;
       }
     }
   }
 }
 
-const particles = Array.from({length:PARTICLE_COUNT}, (_,i)=>new Particle(i));
-
-function setShape(key) {
-  const pts = generateLinePoints(SHAPES[key], PARTICLE_COUNT);
-  particles.forEach((p,i)=>p.setTarget(pts[i][0], pts[i][1]));
-}
-function setLoveShape() {
-  const pts = generateLovePoints(PARTICLE_COUNT);
-  particles.forEach((p,i)=>p.setTarget(pts[i][0], pts[i][1]));
-}
-function setHandShape(allPoints) {
-  particles.forEach((p,i)=>{
-    if(i < allPoints.length) p.setTarget(allPoints[i][0], allPoints[i][1]);
-  });
+function getDualHands() {
+  if (handData.length < 2) return { left: handData[0], right: handData[1] };
+  let left = handData.find(h => h.label === 'Left');
+  let right = handData.find(h => h.label === 'Right');
+  if (!left || !right) {
+    const sorted = [...handData].sort((a, b) => a.centerX - b.centerX);
+    left = sorted[0];
+    right = sorted[1];
+  }
+  return { left, right };
 }
 
-// ==================== 火花特效 ====================
-const sparkles = [];
-function emitSparkles(time) {
-  if(sparkles.length>PERF.maxSparkles) return;
-  const p = particles[Math.floor(Math.random()*particles.length)];
-  if(Math.random()<PERF.sparkleChance) {
-    sparkles.push({
-      x:p.x, y:p.y, vx:(Math.random()-.5)*3, vy:-1-Math.random()*3,
-      life:1, decay:0.015+Math.random()*0.02, size:1+Math.random()*2, color:p.color
+function updatePhotoTreeUI(time, leftHand, rightHand, displayActive, exploded = false) {
+  if (!photoUrls.length || !displayActive) {
+    photoNodes.forEach(node => node.classList.remove('visible'));
+    featuredPhoto.classList.remove('visible');
+    return;
+  }
+
+  const centerX = window.innerWidth / 2;
+  const centerY = window.innerHeight / 2 + 18;
+  const scale = Math.min(window.innerWidth, window.innerHeight) / 310;
+  const visibleCount = photoNodes.length;
+  for (let i = 0; i < visibleCount; i++) {
+    const node = photoNodes[i];
+    let x, y, z, depth;
+    if (exploded) {
+      const a = i * 2.399963 + time * 0.08;
+      const ring = Math.sqrt((i + 0.5) / Math.max(1, visibleCount));
+      x = Math.cos(a) * ring * 145;
+      y = Math.sin(a * 1.3) * ring * 96;
+      z = Math.sin(a) * 90;
+      depth = 0.72 + (z + 90) / 260;
+    } else {
+      const level = visibleCount <= 1 ? 0.5 : i / (visibleCount - 1);
+      y = 82 - level * 168;
+      const taper = Math.max(0.08, 1 - level);
+      const radius = 18 + taper * 62;
+      const a = (i / Math.max(1, visibleCount)) * Math.PI * 2 * 3 + time * 0.42;
+      x = Math.cos(a) * radius;
+      z = Math.sin(a) * radius;
+      depth = 0.75 + (z + 75) / 220;
+    }
+    node.style.left = `${centerX + x * scale}px`;
+    node.style.top = `${centerY - y * scale}px`;
+    node.style.transform = `translate(-50%,-50%) scale(${Math.max(0.42, depth)})`;
+    node.style.zIndex = String(12 + Math.round(depth * 10));
+    node.classList.add('visible');
+  }
+
+  const leftOpen = leftHand && leftHand.fingers >= 4 && !leftHand.isFist;
+  if (leftOpen) {
+    if (!featuredPhoto.classList.contains('visible')) {
+      setFeaturedPhoto(Math.floor(Math.random() * photoUrls.length));
+    }
+    featuredPhoto.classList.add('visible');
+    const now = performance.now();
+    if (lastWaveX !== null && now - lastWaveAt > 520) {
+      const dx = leftHand.centerX - lastWaveX;
+      if (Math.abs(dx) > 0.13) {
+        setFeaturedPhoto(activePhotoIndex + (dx > 0 ? 1 : -1));
+        lastWaveAt = now;
+      }
+    }
+    lastWaveX = leftHand.centerX;
+  } else {
+    featuredPhoto.classList.remove('visible');
+    lastWaveX = leftHand ? leftHand.centerX : null;
+  }
+}
+
+function hidePhotoTreeUI() {
+  photoNodes.forEach(node => node.classList.remove('visible'));
+  featuredPhoto.classList.remove('visible');
+  lastWaveX = null;
+  if (photoDisplayMode !== 'none') updateColors();
+  photoDisplayMode = 'none';
+}
+
+// ==================== FIST ORBIT ====================
+let fistCX=0, fistCY=0;
+const fistData = [];
+function initFistData() {
+  fistData.length = 0;
+  for (let i = 0; i < particleCount; i++) {
+    fistData.push({
+      angle: Math.random()*Math.PI*2,
+      orbitR: 30+Math.random()*120,
+      orbitSpeed: 0.008+Math.random()*0.02,
+      bob: Math.random()*Math.PI*2,
+      bobSpeed: 0.02+Math.random()*0.04,
+      bobAmp: 10+Math.random()*40,
     });
   }
 }
-function updateSparkles() {
-  for(let i=sparkles.length-1;i>=0;i--) {
-    const s=sparkles[i];
-    s.x+=s.vx; s.y+=s.vy; s.vy+=0.02; s.life-=s.decay;
-    if(s.life<=0){sparkles.splice(i,1);continue;}
-    ctx.beginPath(); ctx.arc(s.x,s.y,s.size*s.life,0,Math.PI*2);
-    ctx.fillStyle=`rgba(${s.color[0]},${s.color[1]},${s.color[2]},${s.life*0.8})`; ctx.fill();
+initFistData();
+
+function updateFistTargets(cx, cy, time) {
+  for (let i = 0; i < particleCount; i++) {
+    const fd = fistData[i];
+    fd.angle += fd.orbitSpeed;
+    fd.bob += fd.bobSpeed;
+    targetPositions[i*3]   = cx + Math.cos(fd.angle)*fd.orbitR;
+    targetPositions[i*3+1] = cy + Math.sin(fd.angle)*fd.orbitR + Math.sin(fd.bob)*fd.bobAmp;
+    targetPositions[i*3+2] = Math.sin(fd.angle*0.5)*30;
   }
 }
 
-// ==================== 背景星空 ====================
-const bgStars = Array.from({length:PERF.bgStarCount}, ()=>({
-  x:Math.random(),y:Math.random(),s:0.3+Math.random()*1.5,b:0.3+Math.random()*0.7,sp:1+Math.random()*3
-}));
-function drawBgStars(time) {
-  for(const st of bgStars) {
-    const a=st.b*(0.6+0.4*Math.sin(time*st.sp));
-    const [r,g,b]=hslToRgb((time*10+st.x*360)%360,40,85);
-    ctx.fillStyle=`rgba(${r},${g},${b},${a})`;
-    ctx.fillRect(st.x*W,st.y*H,st.s,st.s);
+// ==================== COLOR ====================
+function updateColors() {
+  if(!geometry) return;
+  const arr = geometry.attributes.color.array;
+  for (let i = 0; i < particleCount; i++) {
+    const hsl = {}; baseColor.getHSL(hsl);
+    const hueShift = Math.sin(phases[i])*0.04;
+    const c = new THREE.Color().setHSL(hsl.h+hueShift, hsl.s, hsl.l*(0.6+Math.random()*0.4));
+    arr[i*3]=c.r; arr[i*3+1]=c.g; arr[i*3+2]=c.b;
   }
+  geometry.attributes.color.needsUpdate = true;
 }
 
-// ==================== LOVE 背景光晕 ====================
-function drawLoveGlow(time) {
-  const pulse=0.3+0.2*Math.sin(time*2);
-  const [r,g,b]=hslToRgb((time*30)%360,80,50);
-  const grad=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*0.5);
-  grad.addColorStop(0,`rgba(${r},${g},${b},${pulse*0.15})`);
-  grad.addColorStop(0.5,`rgba(${r},${g},${b},${pulse*0.05})`);
-  grad.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
-}
-
-// ==================== 双手光晕 ====================
-function drawHandsGlow(time, cx1, cy1, cx2, cy2) {
-  const pulse=0.25+0.15*Math.sin(time*2.5);
-  for(const [cx,cy] of [[cx1,cy1],[cx2,cy2]]) {
-    const hue=(time*40+cx/W*180)%360;
-    const [r,g,b]=hslToRgb(hue,80,50);
-    const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,200);
-    grad.addColorStop(0,`rgba(${r},${g},${b},${pulse*0.2})`);
-    grad.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=grad; ctx.fillRect(cx-200,cy-200,400,400);
+function updatePhotoTreeColors() {
+  if (!geometry) return;
+  if (!photoTreeReady || photoTreeData.length !== particleCount) initPhotoTreeData();
+  const arr = geometry.attributes.color.array;
+  const palette = {
+    red: new THREE.Color('#ff3b3b'),
+    gold: new THREE.Color('#ffd45a'),
+    white: new THREE.Color('#f7fff4'),
+    star: new THREE.Color('#ffe86b')
+  };
+  for (let i = 0; i < particleCount; i++) {
+    const d = photoTreeData[i] || {};
+    let c;
+    if (d.ornament) {
+      c = palette[d.ornament] || palette.gold;
+    } else {
+      const twinkle = 0.54 + 0.28 * Math.sin(phases[i] * 2.7);
+      c = new THREE.Color().setHSL(0.34 + Math.sin(phases[i]) * 0.035, 0.86, twinkle);
+    }
+    arr[i*3] = c.r;
+    arr[i*3+1] = c.g;
+    arr[i*3+2] = c.b;
   }
+  geometry.attributes.color.needsUpdate = true;
 }
 
-// ==================== 手势状态 ====================
-const MAX_HANDS = 2;
+// ==================== MEDIAPIPE HANDS ====================
 let handSmoothed = [null, null];
-let handData = [];        // [{landmarks, fingers, isFist, centerX, centerY}, ...]
-let gestureMode = 'idle'; // idle | number | love | fist | hands
-let currentFingers = -1;
-let pendingGestureKey = '';
-let pendingGestureFrames = 0;
-let lastShapedMode = '';
-let lastShapedFingers = -1;
+let handData = [];
+// per-hand fingers history for smoothing (index 0 and 1)
+let fingersHistory = [[], []];
+const FINGERS_HIST_MS = 400;
+let pendingKey = '', pendingFrames = 0;
+let lastShapedMode = '', lastShapedFingers = -1;
 
-// 平滑单只手
 function smoothHand(lms, idx) {
   if(!handSmoothed[idx]) { handSmoothed[idx]=lms.map(l=>({x:l.x,y:l.y,z:l.z})); return handSmoothed[idx]; }
   const s=handSmoothed[idx];
-  for(let i=0;i<lms.length;i++) {
-    s[i].x+=(lms[i].x-s[i].x)*0.35;
-    s[i].y+=(lms[i].y-s[i].y)*0.35;
-    s[i].z+=(lms[i].z-s[i].z)*0.35;
-  }
+  for(let i=0;i<lms.length;i++){s[i].x+=(lms[i].x-s[i].x)*.35;s[i].y+=(lms[i].y-s[i].y)*.35;s[i].z+=(lms[i].z-s[i].z)*.35;}
   return s;
 }
 
-function dist(a, b) {
-  return Math.hypot(a.x-b.x, a.y-b.y);
+function dist2(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function angleAt(a,b,c){
+  const abx=a.x-b.x, aby=a.y-b.y, cbx=c.x-b.x, cby=c.y-b.y;
+  const denom=Math.max(1e-6, Math.hypot(abx,aby)*Math.hypot(cbx,cby));
+  return Math.acos(Math.max(-1, Math.min(1, (abx*cbx+aby*cby)/denom)));
 }
 
 function countFingers(lms) {
-  let c = 0;
+  let count = 0;
   const wrist = lms[0];
-  const palmScale = Math.max(0.001, dist(lms[0], lms[9]));
-  const margin = palmScale * 0.15;
-  let openLongFingers = 0;
+  const ps = Math.max(.001, dist2(lms[0], lms[9]));
+  const minDiff = Math.max(ps * 0.08, 0.018);
 
-  // 四指：tip 距手腕 > pip 距手腕 + margin，且 tip 未折叠到 mcp 附近
-  const fourFingers = [[8,6,5],[12,10,9],[16,14,13],[20,18,17]];
-  for(const [tip, pip, mcp] of fourFingers) {
-    const tipDist = dist(lms[tip], wrist);
-    const pipDist = dist(lms[pip], wrist);
-    const folded = dist(lms[tip], lms[mcp]) < palmScale * 0.55;
-    if(tipDist > pipDist + margin && !folded) {
-      c++;
-      openLongFingers++;
+  // Count fingers by shape, not screen tilt. This stays stable when the hand rotates.
+  for (const [tip, pip, mcp] of [[8, 6, 5], [12, 10, 9], [16, 14, 13], [20, 18, 17]]) {
+    const tipDist = dist2(lms[tip], wrist);
+    const pipDist = dist2(lms[pip], wrist);
+    const mcpDist = dist2(lms[mcp], wrist);
+    const straight = angleAt(lms[tip], lms[pip], lms[mcp]) > 2.35;
+    if (straight && tipDist > pipDist + minDiff && pipDist > mcpDist - minDiff) {
+      count++;
     }
   }
 
-  // 拇指：手机/平板上手掌角度变化大，不能只看横向或“比指节更远”。
-  // 张开五指时，拇指通常会远离掌心、远离食指根部，并相对拇指根部向侧边打开。
   const thumbTip = lms[4];
   const thumbIp = lms[3];
   const thumbMcp = lms[2];
-  const palmCenter = {x:(lms[0].x+lms[5].x+lms[9].x+lms[13].x+lms[17].x)/5, y:(lms[0].y+lms[5].y+lms[9].y+lms[13].y+lms[17].y)/5};
-  const thumbExtended = dist(thumbTip, wrist) > dist(thumbIp, wrist) + palmScale * 0.04 || dist(thumbTip, thumbMcp) > palmScale * 0.48;
-  const thumbSideOpen = Math.abs(thumbTip.x - thumbMcp.x) > palmScale * 0.12 || dist(thumbTip, lms[5]) > dist(thumbMcp, lms[5]) + palmScale * 0.03;
-  const thumbAwayFromPalm = dist(thumbTip, palmCenter) > palmScale * (openLongFingers === 4 ? 0.58 : 0.68);
-  const thumbNotTucked = dist(thumbTip, lms[6]) > palmScale * 0.34 && dist(thumbTip, lms[10]) > palmScale * 0.42;
-  if(thumbExtended && thumbSideOpen && thumbAwayFromPalm && thumbNotTucked) c++;
-
-  return c;
+  const indexBase = lms[5];
+  const thumbDist = dist2(thumbTip, wrist);
+  const thumbIpDist = dist2(thumbIp, wrist);
+  const thumbStraight = angleAt(thumbTip, thumbIp, thumbMcp) > 2.1;
+  const thumbExtended = thumbStraight && thumbDist > thumbIpDist + minDiff * 0.7;
+  const thumbSeparated = dist2(thumbTip, indexBase) > ps * 0.34;
+  if (thumbExtended && thumbSeparated) count++;
+  return count;
 }
 
-// =============== 时间投票平滑 ===============
-const fingersHistory = [];
-const FINGERS_HISTORY_MS = 250;
-
-function getSmoothedFingers(raw) {
+function getSmoothedFingers(raw, handIndex = 0) {
   const now = performance.now();
-  fingersHistory.push({v: raw, t: now});
-  while(fingersHistory.length > 0 && now - fingersHistory[0].t > FINGERS_HISTORY_MS)
-    fingersHistory.shift();
-
-  if(fingersHistory.length === 0) return raw;
-
-  // 投票：取众数
-  const counts = {};
-  let maxCount = 0, mode = raw;
-  for(const h of fingersHistory) {
+  const hist = fingersHistory[handIndex] || (fingersHistory[handIndex] = []);
+  hist.push({ v: raw, t: now });
+  while (hist.length && now - hist[0].t > FINGERS_HIST_MS) hist.shift();
+  const counts = {}; let mx = 0, mode = raw;
+  for (const h of hist) {
     counts[h.v] = (counts[h.v] || 0) + 1;
-    if(counts[h.v] > maxCount) { maxCount = counts[h.v]; mode = h.v; }
+    if (counts[h.v] > mx) { mx = counts[h.v]; mode = h.v; }
+  }
+  const strongMajority = mx >= Math.ceil(hist.length * 0.65);
+  if (!strongMajority && handData[handIndex] && typeof handData[handIndex].fingers === 'number') {
+    return handData[handIndex].fingers;
   }
   return mode;
 }
 
 function detectFist(lms) {
-  const palmScale = Math.max(0.001, dist(lms[0], lms[9]));
-  const px=(lms[0].x+lms[9].x)/2, py=(lms[0].y+lms[9].y)/2;
-  const ps=palmScale*1.05;
-  for(let i=8;i<=20;i+=4) if(Math.hypot(lms[i].x-px,lms[i].y-py)>ps) return false;
+  const ps=Math.max(.001,dist2(lms[0],lms[9]));
+  const px=(lms[0].x+lms[9].x)/2,py=(lms[0].y+lms[9].y)/2,ps2=ps*1.05;
+  for(let i=8;i<=20;i+=4) if(Math.hypot(lms[i].x-px,lms[i].y-py)>ps2) return false;
   return true;
 }
 
 function stabilizeGesture(nextMode, nextFingers) {
   const key = `${nextMode}:${nextFingers}`;
-  if(key === pendingGestureKey) pendingGestureFrames++;
-  else {
-    pendingGestureKey = key;
-    pendingGestureFrames = 1;
-  }
-  // 时间投票已平滑手指计数，这里只防模式跳变
-  const needed = nextMode === 'idle' ? 4 : 2;
-  if(pendingGestureFrames >= needed || (gestureMode === 'idle' && nextMode !== 'idle')) {
-    gestureMode = nextMode;
-    currentFingers = nextFingers;
+  if (key === pendingKey) pendingFrames++; else { pendingKey = key; pendingFrames = 1; }
+  const needed = nextMode === 'idle' ? 4 : 4;
+  if (pendingFrames >= needed || (gestureMode === 'idle' && nextMode !== 'idle' && pendingFrames >= 2)) {
+    gestureMode = nextMode; currentFingers = nextFingers;
   }
 }
 
-// ==================== 手部绘制 ====================
-function drawAllHands() {
+// ==================== HAND DRAWING (2D overlay) ====================
+function resizeHandCanvas() {
+  handCanvas.width = window.innerWidth;
+  handCanvas.height = window.innerHeight;
+}
+resizeHandCanvas();
+
+function drawHands2D() {
+  handCtx.clearRect(0,0,handCanvas.width,handCanvas.height);
   for(const hd of handData) {
     const lms=hd.landmarks, isF=hd.isFist;
-    const c1=isF?'rgba(255,180,100,':'rgba(100,200,255,';
-    ctx.strokeStyle=c1+'0.4)'; ctx.lineWidth=2;
-    for(const [a,b] of HAND_CONNECTIONS) {
-      ctx.beginPath();
-      ctx.moveTo(lms[a].x*W,lms[a].y*H);
-      ctx.lineTo(lms[b].x*W,lms[b].y*H);
-      ctx.stroke();
+    const col=isF?'rgba(255,180,100,':'rgba(100,200,255,';
+    handCtx.strokeStyle=col+'0.3)'; handCtx.lineWidth=1.5;
+    const W=handCanvas.width, H=handCanvas.height;
+    for(const [a,b] of HAND_CONNS) {
+      handCtx.beginPath();
+      handCtx.moveTo(lms[a].x*W,lms[a].y*H);
+      handCtx.lineTo(lms[b].x*W,lms[b].y*H);
+      handCtx.stroke();
     }
     for(const l of lms) {
-      const x=l.x*W,y=l.y*H;
-      ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fillStyle=c1+'0.7)';ctx.fill();
-      ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fillStyle=c1+'0.15)';ctx.fill();
+      handCtx.beginPath(); handCtx.arc(l.x*W,l.y*H,3,0,Math.PI*2);
+      handCtx.fillStyle=col+'0.6)'; handCtx.fill();
     }
   }
 }
 
-// ==================== UI 文字 ====================
-function drawText() {
-  ctx.textAlign='center'; ctx.textBaseline='top';
-  if(gestureMode==='idle') {
-    ctx.font='600 24px "Segoe UI",sans-serif';
-    const p=0.6+0.4*Math.sin(Date.now()*0.003);
-    ctx.fillStyle=`rgba(255,215,0,${p})`;
-    ctx.fillText('请伸出手掌，对准摄像头',W/2,30);
-    ctx.font='16px "Segoe UI",sans-serif';
-    ctx.fillStyle='rgba(200,200,255,0.5)';
-    ctx.fillText('1-4 指=数字 | 五指张开=LOVE | 握拳=跟随 | 双手=模仿手势',W/2,64);
-  } else if(gestureMode==='hands') {
-    ctx.font='bold 32px "Segoe UI",sans-serif';
-    const hue=(Date.now()*0.06)%360;
-    ctx.fillStyle=`hsl(${hue},100%,65%)`;
-    ctx.fillText('双手模式 - 粒子模仿手势',W/2,30);
-    const f1=handData[0]?handData[0].fingers:'?';
-    const f2=handData.length>1?handData[1].fingers:'?';
-    ctx.font='16px "Segoe UI",sans-serif';
-    ctx.fillStyle='rgba(200,200,255,0.5)';
-    ctx.fillText(`左手: ${f1}指  右手: ${f2}指`,W/2,68);
-  } else if(gestureMode==='fist') {
-    ctx.font='bold 30px "Segoe UI",sans-serif';
-    ctx.fillStyle='rgba(255,180,100,0.9)';
-    ctx.fillText('拳头模式',W/2,30);
-  } else if(gestureMode==='love') {
-    ctx.font='bold 32px "Segoe UI",sans-serif';
-    ctx.fillStyle=`hsl(${(Date.now()*0.06)%360},100%,65%)`;
-    ctx.fillText('LOVE 模式',W/2,30);
-  } else {
-    ctx.font='bold 28px "Segoe UI",sans-serif';
-    ctx.fillStyle='rgba(255,215,0,0.9)';
-    ctx.fillText(`数字 ${currentFingers}`,W/2,30);
-    ctx.font='14px "Segoe UI",sans-serif';
-    ctx.fillStyle='rgba(200,200,255,0.4)';
-    ctx.fillText(`检测到 ${currentFingers} 根手指`,W/2,64);
+// ==================== UI HUD ====================
+function updateHud() {
+  switch(gestureMode) {
+    case 'idle':
+      modeText.textContent = 'IDLE';
+      subText.textContent = 'Show hand to interact · Select model on panel';
+      break;
+    case 'number':
+      modeText.textContent = `NUMBER ${currentFingers}`;
+      subText.textContent = `${currentFingers} finger${currentFingers>1?'s':''} detected`;
+      break;
+    case 'love':
+      modeText.textContent = 'LOVE';
+      subText.textContent = 'Open palm detected';
+      break;
+    case 'fist':
+      modeText.textContent = 'FIST';
+      subText.textContent = 'Closed fist — particles follow hand';
+      break;
+    case 'hands':
+      modeText.textContent = 'DUAL HAND';
+      subText.textContent = 'Both hands — mimicking gestures';
+      break;
   }
 }
 
-// ==================== 主循环 ====================
-let startTime=performance.now();
-let lovePhase=0;
+// ==================== ANIMATION LOOP ====================
+const clock = new THREE.Clock();
 
-function animate() {
-  const time=(performance.now()-startTime)/1000;
-  lovePhase=time*50;
+function animate(now = 0) {
+  requestAnimationFrame(animate);
+  if (TARGET_FRAME_MS && now - lastRenderAt < TARGET_FRAME_MS) return;
+  lastRenderAt = now;
+  const elapsed = clock.getElapsedTime();
 
-  // 背景
-  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
-  const grad=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*0.7);
-  grad.addColorStop(0,'#0a0a2e');grad.addColorStop(0.5,'#050520');grad.addColorStop(1,'#000005');
-  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
-  drawBgStars(time);
+  if (material) material.uniforms.uTime.value = elapsed;
 
-  // 判断手势模式
-  const prevMode = gestureMode;
-  const prevFingers = currentFingers;
-  if(handData.length >= 2) {
+  // Determine gesture mode
+  if (handData.length >= 2) {
     stabilizeGesture('hands', -1);
-  } else if(handData.length === 1) {
+  } else if (handData.length === 1) {
     const hd = handData[0];
-    // 拳头与手指互斥：有手指伸开时不判定为拳头
-    const effectiveFist = hd.isFist && hd.fingers <= 1;
-    if(effectiveFist) stabilizeGesture('fist', 0);
-    else if(hd.fingers === 5) stabilizeGesture('love', 5);
-    else if(hd.fingers >= 1 && hd.fingers <= 4) stabilizeGesture('number', hd.fingers);
+    const ef = hd.isFist && hd.fingers <= 1;
+    if (ef) stabilizeGesture('fist', 0);
+    else if (hd.fingers === 5) stabilizeGesture('love', 5);
+    else if (hd.fingers >= 1 && hd.fingers <= 4) stabilizeGesture('number', hd.fingers);
     else stabilizeGesture('idle', -1);
   } else {
     stabilizeGesture('idle', -1);
   }
 
-  // 形状切换
-  const numberChanged = gestureMode === 'number' && currentFingers !== prevFingers;
-  const needsShape = gestureMode !== lastShapedMode || numberChanged || (gestureMode === 'number' && currentFingers !== lastShapedFingers);
-  if(needsShape) {
-    if(gestureMode === 'love') setLoveShape();
-    else if(gestureMode === 'hands') {
-      // targets set per-frame in update
-    } else if(gestureMode === 'number') setShape(currentFingers);
+  // Shape updates
+  const modeChanged = gestureMode !== lastShapedMode;
+  const fingersChanged = gestureMode==='number' && currentFingers!==lastShapedFingers;
+
+  if (modeChanged || fingersChanged) {
+    switch(gestureMode) {
+      case 'idle':
+        hidePhotoUpload();
+        hidePhotoTreeUI();
+        setModelShape(manualModel);
+        controls.autoRotate = true;
+        break;
+      case 'number':
+        hidePhotoUpload();
+        hidePhotoTreeUI();
+        resetFrontView();
+        genNumber(particleCount, currentFingers);
+        controls.autoRotate = false;
+        break;
+      case 'love':
+        hidePhotoUpload();
+        hidePhotoTreeUI();
+        resetFrontView();
+        genLove(particleCount);
+        controls.autoRotate = false;
+        break;
+      case 'fist':
+        hidePhotoUpload();
+        hidePhotoTreeUI();
+        initFistData();
+        controls.autoRotate = false;
+        break;
+      case 'hands':
+        resetFrontView(240);
+        showPhotoUpload();
+        if (photoUrls.length) {
+          initPhotoTreeData();
+          updatePhotoTreeColors();
+          startTransition();
+        }
+        controls.autoRotate = false;
+        break;
+    }
     lastShapedMode = gestureMode;
     lastShapedFingers = currentFingers;
-    if(gestureMode !== prevMode || numberChanged) log(`模式: ${gestureMode}` + (gestureMode === 'number' ? ` (${currentFingers}指)` : handData.length ? ` (${handData.length}手)` : ''));
   }
 
-  // 双手模式持续更新目标
-  if(gestureMode === 'hands' && handData.length >= 2) {
-    const half = Math.floor(PARTICLE_COUNT / 2);
-    const pts0 = generateHandPoints(handData[0].landmarks, half);
-    const pts1 = generateHandPoints(handData[1].landmarks, PARTICLE_COUNT - half);
-    const allPts = [...pts0, ...pts1];
-    setHandShape(allPts);
-    drawHandsGlow(time, handData[0].centerX*W, handData[0].centerY*H,
-                       handData[1].centerX*W, handData[1].centerY*H);
-  }
-
-  // 单手拳头持续更新
-  if(gestureMode === 'fist' && handData.length === 1) {
+  // Per-frame updates
+  if (gestureMode === 'fist' && handData.length === 1) {
     const hd = handData[0];
-    particles.forEach(p => p.fistUpdate(time, hd.centerX*W, hd.centerY*H));
+    fistCX += (hd.centerX * 200 - 100 - fistCX) * 0.1;
+    fistCY += (-(hd.centerY * 200 - 100) - fistCY) * 0.1;
+    updateFistTargets(fistCX, fistCY, elapsed);
   }
 
-  const isEnhanced = (gestureMode==='love' || gestureMode==='hands');
-  if(gestureMode==='love') drawLoveGlow(time);
-
-  for(const p of particles) {
-    if(gestureMode==='idle') p.idleUpdate(time);
-    // fist/hands targets already set above
-    if(gestureMode==='love') { p.loveUpdate(time, lovePhase); p._loveMode=true; }
-    else if(gestureMode==='hands') { p.handsUpdate(time); p._loveMode=true; }
-    else { p.numberUpdate(time); p._loveMode=false; }
-    p.update(time);
-    p.draw(isEnhanced);
-  }
-
-  if(gestureMode==='love') { emitSparkles(time); updateSparkles(); }
-  if(gestureMode==='hands') { emitSparkles(time); updateSparkles(); }
-
-  drawAllHands();
-  drawText();
-  requestAnimationFrame(animate);
-}
-
-let animationStarted = false;
-function startAnimation() {
-  if(animationStarted) return;
-  animationStarted = true;
-  animate();
-}
-
-let cameraActive = false;
-let sendingFrame = false;
-let lastHandFrameTime = 0;
-
-async function openCameraStream() {
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    throw new Error('当前浏览器不支持摄像头访问');
-  }
-  const constraintsList = [
-    {audio:false, video:{width:{ideal:PERF.cameraWidth}, height:{ideal:PERF.cameraHeight}, facingMode:{ideal:'user'}}},
-    {audio:false, video:{facingMode:'user'}},
-    {audio:false, video:true}
-  ];
-  let lastError;
-  for(const constraints of constraintsList) {
-    try {
-      return await navigator.mediaDevices.getUserMedia(constraints);
-    } catch(err) {
-      lastError = err;
-    }
-  }
-  throw lastError || new Error('摄像头打开失败');
-}
-
-function startHandFrameLoop(hands) {
-  cameraActive = true;
-  const handFrameInterval = 1000 / PERF.handFps;
-  async function sendFrame() {
-    if(!cameraActive) return;
-    const now = performance.now();
-    if(video.readyState >= 2 && !sendingFrame && now - lastHandFrameTime >= handFrameInterval) {
-      lastHandFrameTime = now;
-      sendingFrame = true;
-      try {
-        await hands.send({image:video});
-      } catch(err) {
-        console.warn('[Star] hand frame failed', err);
-      }
-      sendingFrame = false;
-    }
-    requestAnimationFrame(sendFrame);
-  }
-  sendFrame();
-}
-
-// ==================== MediaPipe 初始化 ====================
-async function init() {
-  if(typeof Hands==='undefined') {
-    log('错误: MediaPipe Hands 未加载');
-    loading.innerHTML='<div style="color:#ff6b6b;text-align:center;max-width:420px;padding:20px;"><p style="font-size:18px">MediaPipe 加载失败</p><p style="font-size:13px;color:#888;margin-top:8px">请检查网络后刷新</p></div>';
-    startAnimation(); return;
-  }
-  log(`性能模式: ${PERF.label} / ${PARTICLE_COUNT} 粒子 / ${PERF.handFps}fps识别`);
-  try {
-    const hands = new Hands({
-      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`
-    });
-    hands.setOptions({
-      maxNumHands: MAX_HANDS,
-      modelComplexity: PERF.modelComplexity,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.5
-    });
-    hands.onResults(results => {
-      const prevCount = handData.length;
-      handData = [];
-      if(results.multiHandLandmarks) {
-        for(let i=0; i<results.multiHandLandmarks.length; i++) {
-          const raw = results.multiHandLandmarks[i];
-          const lms = smoothHand(raw, i);
-          const rawFingers = countFingers(lms);
-          const fingers = i === 0 ? getSmoothedFingers(rawFingers) : rawFingers;
-          const isFist = detectFist(lms);
-          const cx = lms[0].x, cy = lms[0].y;
-          handData.push({landmarks:lms, fingers, isFist, centerX:cx, centerY:cy});
+  if (gestureMode === 'hands' && handData.length >= 2) {
+    const { left, right } = getDualHands();
+    if (!photoUrls.length) {
+      showPhotoUpload();
+      hidePhotoTreeUI();
+      genDualHand(handData[0].landmarks, handData[1].landmarks, particleCount);
+    } else {
+      hidePhotoUpload();
+      const treeActive = right && right.isFist;
+      const exploded = right && right.fingers >= 4 && !right.isFist;
+      const displayActive = treeActive || exploded;
+      const nextPhotoMode = treeActive ? 'tree' : exploded ? 'exploded' : 'hands';
+      if (nextPhotoMode !== photoDisplayMode) {
+        photoDisplayMode = nextPhotoMode;
+        if (displayActive) {
+          updatePhotoTreeColors();
+          startTransition();
+        } else {
+          updateColors();
         }
       }
-      if(handData.length !== prevCount) {
-        handSmoothed = [handData[0]?handSmoothed[0]:null, handData[1]?handSmoothed[1]:null];
+      if (displayActive) updatePhotoTreeTargets(elapsed, exploded);
+      else genDualHand(handData[0].landmarks, handData[1].landmarks, particleCount);
+      updatePhotoTreeUI(elapsed, left, right, displayActive, exploded);
+    }
+  }
+
+  // Lerp positions
+  if (geometry) {
+    const posArr = geometry.attributes.position.array;
+    for (let i = 0; i < particleCount; i++) {
+      animProgress[i] = Math.min(1, animProgress[i] + 0.018);
+      const ease = 1 - Math.pow(1 - Math.max(0, animProgress[i]), 3);
+      const ls = 0.045 * ease;
+      const i3 = i*3;
+      posArr[i3]   += (targetPositions[i3]   - posArr[i3])   * ls;
+      posArr[i3+1] += (targetPositions[i3+1] - posArr[i3+1]) * ls;
+      posArr[i3+2] += (targetPositions[i3+2] - posArr[i3+2]) * ls;
+    }
+    geometry.attributes.position.needsUpdate = true;
+  }
+
+  updateHud();
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ==================== MEDIAPIPE INIT ====================
+async function initHandTracking() {
+  if (typeof Hands === 'undefined') {
+    console.warn('MediaPipe Hands not loaded');
+    return;
+  }
+  const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}` });
+  hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5 });
+  hands.onResults(results => {
+    handData = [];
+    if (results.multiHandLandmarks) {
+      for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+        const raw = results.multiHandLandmarks[i];
+        const lms = smoothHand(raw, i);
+        const rawF = countFingers(lms);
+        const fingers = getSmoothedFingers(rawF, i);
+        const isFist = detectFist(lms);
+        const label = results.multiHandedness && results.multiHandedness[i] ? results.multiHandedness[i].label : '';
+        handData.push({ landmarks: lms, fingers, isFist, centerX: lms[0].x, centerY: lms[0].y, label });
       }
-      if(handData.length===0) handSmoothed=[null,null];
-    });
-    log('请求摄像头...');
-    video.muted = true;
-    video.playsInline = true;
-    const stream = await openCameraStream();
+    }
+    if (handData.length===0) {
+      handSmoothed = [null, null];
+      fingersHistory = [[], []];
+    } else if (handData.length===1) {
+      handSmoothed = [handSmoothed[0], null];
+      fingersHistory[1] = [];
+    }
+    drawHands2D();
+  });
+
+  loadingOverlay.classList.remove('hidden');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio:false, video:{width:{ideal:640},height:{ideal:480},facingMode:'user'}});
     video.srcObject = stream;
     await video.play();
-    startHandFrameLoop(hands);
-    loading.classList.add('hidden');
-    log('双手手势检测已启动');
-    startAnimation();
+    const cam = new Camera(video, {
+      onFrame: async () => {
+        const now = performance.now();
+        if (now - lastHandSend < HAND_TRACK_INTERVAL) return;
+        lastHandSend = now;
+        await hands.send({image:video});
+      },
+      width: 640,
+      height: 480
+    });
+    cam.start();
+    loadingOverlay.classList.add('hidden');
   } catch(err) {
-    log('失败: '+err.message);
-    loading.innerHTML=`<div style="color:#ff6b6b;text-align:center;max-width:420px;padding:20px;"><p style="font-size:18px;margin-bottom:12px">初始化失败</p><p style="font-size:14px;color:#aaa">${err.message}</p><p style="font-size:13px;color:#888;margin-top:12px">请用 localhost 或 HTTPS 访问</p></div>`;
-    startAnimation();
+    console.warn('Camera failed:', err);
+    loadingOverlay.classList.add('hidden');
   }
 }
-startAnimation();
-startBtn.addEventListener('click', () => {
+
+// ==================== UI EVENTS ====================
+photoInput.addEventListener('change', e => {
+  const files = Array.from(e.target.files || []).filter(file => file.type.startsWith('image/'));
+  if (!files.length) return;
+  photoUrls.forEach(url => URL.revokeObjectURL(url));
+  photoUrls = files.map(file => URL.createObjectURL(file));
+  activePhotoIndex = 0;
+  lastWaveX = null;
+  photoTreeReady = false;
+  createPhotoNodes();
+  hidePhotoUpload();
+  if (gestureMode === 'hands') {
+    initPhotoTreeData();
+    updatePhotoTreeColors();
+    startTransition();
+  }
+});
+
+// Presets
+PRESETS.forEach(c => {
+  const d = document.createElement('div');
+  d.className = 'dot'; d.style.background = c;
+  d.addEventListener('click', () => setColor(c));
+  presetRow.appendChild(d);
+});
+
+function setColor(hex) {
+  baseColor.set(hex);
+  colorPicker.value = hex; colorHex.value = hex; colorPrev.style.background = hex;
+  updateColors();
+  document.querySelectorAll('.dot').forEach(d => {
+    d.classList.toggle('active', d.style.background === hex || new THREE.Color(d.style.background).equals(new THREE.Color(hex)));
+  });
+}
+
+colorPicker.addEventListener('input', e => setColor(e.target.value));
+colorHex.addEventListener('change', e => { if(/^#[0-9a-fA-F]{6}$/.test(e.target.value)) setColor(e.target.value); });
+
+modelGrid.addEventListener('click', e => {
+  const btn = e.target.closest('.model-btn');
+  if(!btn) return;
+  modelGrid.querySelectorAll('.model-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  manualModel = btn.dataset.model;
+  if (gestureMode === 'idle') setModelShape(manualModel);
+});
+
+countSlider.addEventListener('input', e => {
+  const v=parseInt(e.target.value);
+  countVal.textContent = v>=1000?(v/1000)+'k':v;
+  initParticles(v);
+  initFistData();
+});
+
+sizeSlider.addEventListener('input', e => {
+  pointSize=parseFloat(e.target.value);
+  sizeVal.textContent=pointSize;
+  if(geometry){const s=geometry.attributes.size.array;for(let i=0;i<particleCount;i++)s[i]=pointSize*(0.4+Math.random()*0.6);geometry.attributes.size.needsUpdate=true;}
+});
+
+document.getElementById('btnFS').addEventListener('click', () => {
+  if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+  else document.exitFullscreen();
+});
+
+document.getElementById('togglePanel').addEventListener('click', () => panel.classList.toggle('collapsed'));
+
+window.addEventListener('resize', () => {
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.25 : 2));
+  resizeHandCanvas();
+  if(material) material.uniforms.uPixelRatio.value=renderer.getPixelRatio();
+});
+
+// ==================== START ====================
+startBtn.addEventListener('click', async () => {
   startOverlay.classList.add('hidden');
-  loading.classList.remove('hidden');
-  init();
+  showPhotoUpload();
+  await initHandTracking();
 }, {once:true});
+
+initParticles(particleCount);
+animate();
 </script>
 </body>
 </html>
